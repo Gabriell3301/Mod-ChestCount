@@ -1,0 +1,23 @@
+{
+  "chestcount.text": "%s",
+  "chestcount.registered": "Chest registered! Open it normally to synchronize items.",
+  "chestcount.registered_already": "Chest already registered. Use /chestcount info, rename or remove.",
+  "chestcount.warning": "Warning: %s",
+  "chestcount.error": "Error: %s",
+  "chestcount.unsafe_menu": "Synchronization skipped: this server may replace chest menus. See trustedServers in config.json.",
+  "chestcount.not_ready": "Join a world and wait for local data to load.",
+  "chestcount.reloaded": "Configuration and world data reloaded.",
+  "chestcount.no_results": "No registered chests found.",
+  "chestcount.snapshot": "%s items — last synchronized: %s %s",
+  "chestcount.snapshot_named": "%s — last synchronized: %s",
+  "chestcount.count": "%s chests (%s single, %s double) — %s items — %s item types.",
+  "chestcount.last_known": "Last known snapshots, not live data. Unsynchronized chests have no item results.",
+  "chestcount.renamed": "Chest renamed.",
+  "chestcount.removed": "Chest removed.",
+  "chestcount.confirm_remove": "To delete this record, run /chestcount remove %s confirm within 30 seconds.",
+  "chestcount.confirmation_expired": "No active confirmation. Run remove <id> again.",
+  "chestcount.ambiguous": "Item not found or ambiguous. Specify an exact ID: %s",
+  "chestcount.found": "%s found in %s chests — total: %s.",
+  "chestcount.distance": "Distance: approximately %s blocks.",
+  "chestcount.help": "Commands: /chestcount count | list | location <name> | nearby [radius] | where <item> | info <id> | rename <id> <name> | remove <id> [confirm] | reload | help. Register: sneak + right-click with a compass, then open normally."
+}

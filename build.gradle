@@ -1,0 +1,24 @@
+plugins { id 'net.fabricmc.fabric-loom' version '1.17.21' }
+version = '1.0.0'
+group = 'com.chestcount.mod'
+repositories { mavenCentral() }
+dependencies {
+    minecraft 'com.mojang:minecraft:26.3'
+    implementation 'net.fabricmc:fabric-loader:0.20.1'
+    implementation 'net.fabricmc.fabric-api:fabric-api:0.165.0+26.3'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.14.0'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+tasks.withType(JavaCompile).configureEach { options.release = 25; options.encoding = 'UTF-8' }
+java { withSourcesJar() }
+jar { from('LICENSE') }
+test { useJUnitPlatform() }
+processResources { filesMatching('fabric.mod.json') { expand version: project.version } }
+fabricApi {
+    configureTests {
+        createSourceSet = true
+        modId = 'chestcount-test'
+        enableGameTests = false
+        enableClientGameTests = true
+    }
+}

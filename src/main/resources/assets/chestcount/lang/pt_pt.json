@@ -1,0 +1,23 @@
+{
+  "chestcount.text": "%s",
+  "chestcount.registered": "Baú registado! Abre-o normalmente para sincronizar os itens.",
+  "chestcount.registered_already": "Este baú já está registado. Usa /chestcount info, rename ou remove.",
+  "chestcount.warning": "Aviso: %s",
+  "chestcount.error": "Erro: %s",
+  "chestcount.unsafe_menu": "Sincronização ignorada: este servidor pode substituir interfaces de baús. Consulta trustedServers em config.json.",
+  "chestcount.not_ready": "Entra num mundo e aguarda o carregamento dos dados locais.",
+  "chestcount.reloaded": "Configuração e dados do mundo recarregados.",
+  "chestcount.no_results": "Não foram encontrados baús registados.",
+  "chestcount.snapshot": "%s itens — última sincronização: %s %s",
+  "chestcount.snapshot_named": "%s — última sincronização: %s",
+  "chestcount.count": "%s baús (%s simples, %s duplos) — %s itens — %s tipos de itens.",
+  "chestcount.last_known": "Últimas leituras conhecidas, não são dados em tempo real. Baús não sincronizados não têm resultados de itens.",
+  "chestcount.renamed": "Nome do baú alterado.",
+  "chestcount.removed": "Registo do baú removido.",
+  "chestcount.confirm_remove": "Para eliminar o registo, executa /chestcount remove %s confirm nos próximos 30 segundos.",
+  "chestcount.confirmation_expired": "Sem confirmação ativa. Executa remove <id> novamente.",
+  "chestcount.ambiguous": "Item não encontrado ou pesquisa ambígua. Especifica o ID exato: %s",
+  "chestcount.found": "%s encontrado em %s baús — total: %s.",
+  "chestcount.distance": "Distância aproximada: %s blocos.",
+  "chestcount.help": "Comandos: /chestcount count | list | location <nome> | nearby [raio] | where <item> | info <id> | rename <id> <nome> | remove <id> [confirm] | reload | help. Registar: Shift + botão direito com bússola; depois abre normalmente."
+}

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.chestcount.mod.ServerAddressTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-28T16:06:13.849Z" hostname="C2-AS22-M09" time="0.014">
+  <properties/>
+  <testcase name="ipv6NonDefaultPort()" classname="com.chestcount.mod.ServerAddressTest" time="0.001"/>
+  <testcase name="preservesDifferentPorts()" classname="com.chestcount.mod.ServerAddressTest" time="0.008"/>
+  <testcase name="defaultPortCaseAndTrailingDot()" classname="com.chestcount.mod.ServerAddressTest" time="0.0"/>
+  <testcase name="invalidPortRejected()" classname="com.chestcount.mod.ServerAddressTest" time="0.001"/>
+  <testcase name="ipv6DoesNotCollapseIntoFirstSegment()" classname="com.chestcount.mod.ServerAddressTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

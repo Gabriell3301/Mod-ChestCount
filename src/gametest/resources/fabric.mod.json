@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "id": "chestcount-test",
+  "version": "1.0.0",
+  "name": "Chest Count integration tests",
+  "environment": "client",
+  "entrypoints": { "fabric-client-gametest": ["com.chestcount.mod.ChestCountGameTest"] }
+}

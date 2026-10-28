@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.chestcount.mod.StorageTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-28T16:06:13.865Z" hostname="C2-AS22-M09" time="0.108">
+  <properties/>
+  <testcase name="separateWorldFiles()" classname="com.chestcount.mod.StorageTest" time="0.048"/>
+  <testcase name="futureVersionDoesNotFallBackToOldBackup()" classname="com.chestcount.mod.StorageTest" time="0.021"/>
+  <testcase name="unrecoverableFileCannotBeOverwritten()" classname="com.chestcount.mod.StorageTest" time="0.007"/>
+  <testcase name="recoveryFromBackupPreservesCorruptFile()" classname="com.chestcount.mod.StorageTest" time="0.013"/>
+  <testcase name="futureFormatIsPreserved()" classname="com.chestcount.mod.StorageTest" time="0.006"/>
+  <testcase name="externalCorruptionBlocksSave()" classname="com.chestcount.mod.StorageTest" time="0.005"/>
+  <testcase name="jsonRoundTrip()" classname="com.chestcount.mod.StorageTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

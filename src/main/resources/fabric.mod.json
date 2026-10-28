@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "chestcount",
+  "version": "${version}",
+  "name": "Chest Count",
+  "description": "Local, opt-in chest inventory snapshots.",
+  "environment": "client",
+  "entrypoints": { "client": ["com.chestcount.mod.ChestCountClient"] },
+  "mixins": ["chestcount.mixins.json"],
+  "depends": { "fabricloader": ">=0.20.1", "minecraft": "26.3", "java": ">=25", "fabric-api": ">=0.165.0" },
+  "license": "MIT"
+}

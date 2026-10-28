@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.chestcount.mod.RegistryTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-10-28T16:06:13.778Z" hostname="C2-AS22-M09" time="0.07">
+  <properties/>
+  <testcase name="worldsAreSeparate()" classname="com.chestcount.mod.RegistryTest" time="0.026"/>
+  <testcase name="mergedStructureInvalidatesAndPreservesOldData()" classname="com.chestcount.mod.RegistryTest" time="0.007"/>
+  <testcase name="duplicateDoesNotChangeRevision()" classname="com.chestcount.mod.RegistryTest" time="0.001"/>
+  <testcase name="doubleCanonicalRegardlessOfClickedHalf()" classname="com.chestcount.mod.RegistryTest" time="0.003"/>
+  <testcase name="itemSearchSumsSlotsAndIgnoresUnsynced()" classname="com.chestcount.mod.RegistryTest" time="0.003"/>
+  <testcase name="adjacentSinglesAreNotAutomaticallyMerged()" classname="com.chestcount.mod.RegistryTest" time="0.0"/>
+  <testcase name="destroyedHalfIsInvalidatedWithoutLosingSnapshot()" classname="com.chestcount.mod.RegistryTest" time="0.0"/>
+  <testcase name="distanceAndRadius()" classname="com.chestcount.mod.RegistryTest" time="0.002"/>
+  <testcase name="inventoryAssociationRejectsUntrustedWrongOrUnconfirmed()" classname="com.chestcount.mod.RegistryTest" time="0.002"/>
+  <testcase name="registersSingle()" classname="com.chestcount.mod.RegistryTest" time="0.001"/>
+  <testcase name="removalDoesNotCrossWorld()" classname="com.chestcount.mod.RegistryTest" time="0.001"/>
+  <testcase name="rejectsMalformedItemsAndGeometry()" classname="com.chestcount.mod.RegistryTest" time="0.001"/>
+  <testcase name="dimensionsAreSeparate()" classname="com.chestcount.mod.RegistryTest" time="0.001"/>
+  <testcase name="renameAndSearchByName()" classname="com.chestcount.mod.RegistryTest" time="0.0"/>
+  <testcase name="splitDoubleBlocksSynchronization()" classname="com.chestcount.mod.RegistryTest" time="0.001"/>
+  <testcase name="snapshotReplacesRatherThanAdds()" classname="com.chestcount.mod.RegistryTest" time="0.001"/>
+  <testcase name="emptySnapshotIsSynced()" classname="com.chestcount.mod.RegistryTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
