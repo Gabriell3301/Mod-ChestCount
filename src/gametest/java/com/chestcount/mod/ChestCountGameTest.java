@@ -20,6 +20,14 @@ import net.fabricmc.fabric.api.client.command.v2.*;
 /** Real integrated server packets and UI. Test-only source set, excluded from the release JAR. */
 public final class ChestCountGameTest implements FabricClientGameTest {
     private static void check(boolean condition,String message) { if(!condition) throw new AssertionError(message); }
+    private static long persistedTotal() {
+        var root=net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("chestcount");
+        var app=ChestCountClient.INSTANCE;
+        try {
+            var text=java.nio.file.Files.readString(new com.chestcount.mod.storage.JsonStorageService(root).file(app.world()));
+            return new com.google.gson.Gson().fromJson(text,com.chestcount.mod.storage.JsonStorageService.Document.class).chests().getFirst().total();
+        } catch(Exception e) { return -1; }
+    }
     public void runTest(ClientGameTestContext context) {
         try (var world=context.worldBuilder().create()) {
             context.waitFor(mc -> ChestCountClient.INSTANCE.ready());
@@ -30,6 +38,8 @@ public final class ChestCountGameTest implements FabricClientGameTest {
                 for(int x=-3;x<=3;x++) for(int z=-3;z<=4;z++) level.setBlockAndUpdate(new BlockPos(x,79,z),Blocks.STONE.defaultBlockState());
                 level.setBlockAndUpdate(pos.below(),Blocks.STONE.defaultBlockState());
                 level.setBlockAndUpdate(pos,Blocks.CHEST.defaultBlockState());
+                level.setBlockAndUpdate(pos.west(2),Blocks.CHEST.defaultBlockState());
+                ((ChestBlockEntity)level.getBlockEntity(pos.west(2))).setItem(0,new ItemStack(Items.DIAMOND,5));
                 var chest=(ChestBlockEntity)level.getBlockEntity(pos);
                 chest.setItem(0,new ItemStack(Items.DIAMOND,32));
                 chest.setItem(26,new ItemStack(Items.IRON_INGOT,64));
@@ -53,7 +63,17 @@ public final class ChestCountGameTest implements FabricClientGameTest {
                     mc.player.setItemInHand(InteractionHand.OFF_HAND,ItemStack.EMPTY);
                     check(app.registry().all().size()==1,"Repeated compass registration must not duplicate the record");
                 } finally { mc.player.input.keyPresses=original; }
-                mc.gameMode.useItemOn(mc.player,InteractionHand.MAIN_HAND,hit);
+                // Simulate a pending registered click whose menu never arrived, then open an unmarked chest.
+                app.sync().clicked(id,pos);
+                mc.gameMode.useItemOn(mc.player,InteractionHand.MAIN_HAND,new BlockHitResult(Vec3.atCenterOf(pos.west(2)),Direction.SOUTH,pos.west(2),false));
+            });
+            context.waitFor(mc -> mc.player.containerMenu instanceof ChestMenu);
+            context.waitTicks(3);
+            context.runOnClient(mc -> {
+                var app=ChestCountClient.INSTANCE;
+                check(app.registry().all().size()==1 && app.registry().all().getFirst().syncedAt()==null,"Unmarked chest cannot consume an older pending association");
+                mc.player.closeContainer();
+                mc.gameMode.useItemOn(mc.player,InteractionHand.MAIN_HAND,new BlockHitResult(Vec3.atCenterOf(pos),Direction.SOUTH,pos,false));
             });
             context.waitFor(mc -> ChestCountClient.INSTANCE.registry().all().getFirst().syncedAt()!=null);
             context.runOnClient(mc -> {
@@ -65,7 +85,33 @@ public final class ChestCountGameTest implements FabricClientGameTest {
                 ((ChestBlockEntity)server.overworld().getBlockEntity(pos)).setItem(0,new ItemStack(Items.DIAMOND,7));
             });
             context.waitFor(mc -> ChestCountClient.INSTANCE.registry().all().getFirst().total()==71);
+            // Real client prediction used to hide these changes from the packet-only snapshot.
+            context.runOnClient(mc -> mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId,0,0,net.minecraft.world.inventory.ContainerInput.QUICK_MOVE,mc.player));
+            context.waitFor(mc -> ChestCountClient.INSTANCE.registry().all().getFirst().total()==64);
+            context.runOnClient(mc -> mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId,26,0,net.minecraft.world.inventory.ContainerInput.PICKUP,mc.player));
+            context.waitFor(mc -> ChestCountClient.INSTANCE.registry().all().getFirst().total()==0);
+            context.runOnClient(mc -> mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId,1,0,net.minecraft.world.inventory.ContainerInput.PICKUP,mc.player));
+            context.waitFor(mc -> ChestCountClient.INSTANCE.registry().all().getFirst().total()==64);
+            context.runOnClient(mc -> mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId,1,0,net.minecraft.world.inventory.ContainerInput.SWAP,mc.player));
+            context.waitFor(mc -> ChestCountClient.INSTANCE.registry().all().getFirst().total()==0);
+            context.runOnClient(mc -> mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId,1,0,net.minecraft.world.inventory.ContainerInput.SWAP,mc.player));
+            context.waitFor(mc -> ChestCountClient.INSTANCE.registry().all().getFirst().total()==64);
+            context.runOnClient(mc -> {
+                mc.gameMode.handleContainerInput(mc.player.containerMenu.containerId,1,0,net.minecraft.world.inventory.ContainerInput.QUICK_MOVE,mc.player);
+                mc.player.closeContainer(); // Do not wait for a reply before closing.
+            });
+            context.waitFor(mc -> ChestCountClient.INSTANCE.registry().all().getFirst().total()==0);
+            context.waitFor(mc -> persistedTotal()==0); // No command or explicit flush.
+            context.runOnClient(mc -> mc.gameMode.useItemOn(mc.player,InteractionHand.MAIN_HAND,new BlockHitResult(Vec3.atCenterOf(pos),Direction.SOUTH,pos,false)));
+            context.waitFor(mc -> mc.player.containerMenu instanceof ChestMenu && ChestCountClient.INSTANCE.registry().all().getFirst().total()==0);
+            world.getServer().runOnServer(server -> {
+                var chest=(ChestBlockEntity)server.overworld().getBlockEntity(pos);
+                chest.setItem(0,new ItemStack(Items.DIAMOND,7));
+                chest.setItem(26,new ItemStack(Items.IRON_INGOT,64));
+            });
+            context.waitFor(mc -> ChestCountClient.INSTANCE.registry().all().getFirst().total()==71);
             context.runOnClient(mc -> mc.player.closeContainer());
+            context.waitFor(mc -> persistedTotal()==71);
             context.waitTicks(5);
             // Build an actual double and verify both half states canonicalize to the same identity.
             world.getServer().runOnServer(server -> {
@@ -93,6 +139,23 @@ public final class ChestCountGameTest implements FabricClientGameTest {
                 var source=(FabricClientCommandSource)mc.getConnection().getSuggestionsProvider();
                 try {
                     check(dispatcher.execute("chestcount count",source)==1,"Count command must be local and registered");
+                    check(dispatcher.execute("cc count",source)==1,"Short alias shares handlers");
+                    check(dispatcher.execute("cc",source)==1,"Bare alias shows help");
+                    var app=ChestCountClient.INSTANCE;
+                    var record=app.registry().all().getFirst();
+                    check(dispatcher.execute("cc rename "+record.name()+" Minerios",source)==1,"Rename by generated name");
+                    check(dispatcher.execute("cc info Minerios",source)==1,"Immediate lookup by name");
+                    var suggestions=dispatcher.getCompletionSuggestions(dispatcher.parse("cc info M",source)).join();
+                    check(suggestions.getList().stream().anyMatch(s -> s.getText().equals("Minerios")),"Autocomplete names through alias");
+                    check(dispatcher.execute("cc rename Minerios \"Baú de Minérios\"",source)==1,"Quoted new name");
+                    check(dispatcher.execute("cc info \"Baú de Minérios\"",source)==1,"Quoted lookup");
+                    check(dispatcher.execute("cc remove \"Baú de Minérios\"",source)==1,"Quoted removal request");
+                    check(app.registry().all().size()==1,"Removal request must not delete");
+                    check(dispatcher.execute("cc location Baú de Minérios",source)==1,"Legacy unquoted location");
+                    check(dispatcher.execute("cc info Minerios",source)==0,"Old name must stop resolving");
+                    check(dispatcher.execute("cc rename \"Baú de Minérios\" Recursos",source)==1,"Quoted source name");
+                    check(dispatcher.execute("cc list",source)==1,"Compact list");
+                    check(dispatcher.execute("cc nearby",source)==1,"Compact nearby");
                     check(dispatcher.execute("chestcount where diamond",source)==1,"Item search must work through client dispatcher");
                 } catch(com.mojang.brigadier.exceptions.CommandSyntaxException e) { throw new AssertionError(e); }
                 mc.player.closeContainer();
@@ -105,6 +168,14 @@ public final class ChestCountGameTest implements FabricClientGameTest {
             });
             context.waitTicks(25);
             context.takeScreenshot("chest-count-occluded");
+            context.runOnClient(mc -> {
+                var dispatcher=ClientCommands.getActiveDispatcher();
+                var source=(FabricClientCommandSource)mc.getConnection().getSuggestionsProvider();
+                try {
+                    check(dispatcher.execute("cc remove Recursos confirm",source)==1,"Confirm removal by current name");
+                    check(ChestCountClient.INSTANCE.registry().all().isEmpty(),"Only confirmed removal deletes the record");
+                } catch(com.mojang.brigadier.exceptions.CommandSyntaxException e) { throw new AssertionError(e); }
+            });
         }
     }
 }

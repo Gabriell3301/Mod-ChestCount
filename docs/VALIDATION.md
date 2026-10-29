@@ -1,3 +1,37 @@
+# Validação da refatoração — 29/10/2026
+
+Executada no Windows com Oracle JDK 26.0.1, alvo Java 25, Minecraft 26.3 e as dependências existentes. Sem novas dependências e sem integração REST.
+
+| Execução final | Resultado |
+| --- | --- |
+| `.\gradlew.bat --gradle-user-home .gradle-home test` | BUILD SUCCESSFUL; 43 testes, zero falhas/erros |
+| `.\gradlew.bat --gradle-user-home .gradle-home build` | BUILD SUCCESSFUL |
+| `.\gradlew.bat --gradle-user-home .gradle-home runClientGameTest` | BUILD SUCCESSFUL; cliente gráfico e servidor integrado reais, saída 0 |
+
+Os testes unitários incluem 10 casos de identificadores, 3 de apresentação/traduções, 17 de registo/associação, 8 de armazenamento e 5 de endereços. Relatórios atuais: `build/reports/tests/test/index.html` e `build/test-results/test/`. O log da execução final do cliente está em `build/run/clientGameTest/logs/latest.log`.
+
+O GameTest ampliado passou: baú não registado não consome associação pendente anterior; registo por bússola nas duas mãos; snapshot inicial; itens do jogador excluídos; alteração de slot no servidor; Shift+Click; retirar/colocar stacks; troca por hotbar; fechar no mesmo tick da transferência; JSON atualizado sem comandos; reabrir; gravações posteriores conservam o estado mais recente; baú duplo e proteção estrutural; ambos os comandos raiz; autocomplete Brigadier; renomeação imediata; nomes entre aspas; location antigo sem aspas; nome anterior deixa de resolver; remoção apenas após confirmação. O teste FIFO de armazenamento bloqueia a primeira escrita, enfileira snapshots imutáveis diferentes e verifica que a última versão fica no disco com backup.
+
+A compilação inicial da extensão de GameTest revelou o uso incorreto de `Suggestion.text()`; corrigido para `getText()` antes das execuções finais. Continuam os avisos de APIs obsoletas e avisos do cliente de teste sobre configuração gráfica/Realms sem conta real. Não impediram os testes locais.
+
+Não foi executada ligação a servidor multiplayer externo. Arrastar/QUICK_CRAFT, latência artificial superior a 100 ticks, interrupção física de ligação, disco avariado e visualização PT-PT dentro do jogo continuam no roteiro manual; as chaves e placeholders das duas traduções foram verificados automaticamente. Não se afirma garantia de snapshot final em desconexão ou crash. Os limites do protocolo e do tráfego adicional estão em [SYNCHRONIZATION.md](SYNCHRONIZATION.md).
+
+Ficheiros alterados/adicionados nesta entrega:
+
+- `ChestCountClient.java`: aviso estrutural e limitação de repetição de erros de disco.
+- `service/InventorySyncService.java`: finalização, confirmações, respostas tardias e separação de cliques pendentes.
+- `service/ChestRegistryService.java`: nomes iniciais, normalização, unicidade, resolução e sugestões.
+- `commands/ChestCountCommands.java`: alias partilhado, parsing, respostas compactas e paginação.
+- `interaction/CompassInteractionHandler.java`: nome na confirmação de registo e cancelamento de associação pendente.
+- `mixin/ContainerInteractionMixin.java`, `mixin/LocalPlayerMixin.java`, `chestcount.mixins.json`: confirmação autoritativa dos cliques e fecho.
+- `assets/chestcount/lang/{pt_pt,en_us}.json`: mensagens curtas traduzidas.
+- `IdentifiersTest.java`, `PresentationTest.java`, `StorageTest.java`, `ChestCountGameTest.java`: cobertura ampliada.
+- `README.md`, `COMMANDS.md`, `SYNCHRONIZATION.md`, `MANUAL-TESTS.md`, `VALIDATION.md`: documentação atualizada.
+
+O formato JSON e os UUIDs foram preservados. O JAR final é `build/libs/chest-count-1.0.0.jar`.
+
+---
+
 # Validação executada — 28/10/2026
 
 Diretório: `C:\Users\2025168383\Desktop\Mod-ChestCount`. A pasta estava vazia na inspeção inicial. As ferramentas, caches Gradle e mundos temporários usados nesta validação ficam dentro do projeto. Não foi utilizado outro projeto.

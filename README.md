@@ -28,31 +28,32 @@ Versões verificadas em 28/10/2026 nas fontes oficiais:
 
 1. Segura uma **bússola vanilla numa das mãos**.
 2. Faz **Shift + botão direito** num baú normal. Baús armadilhados e ender chests estão excluídos.
-3. O mod regista o baú, cancela essa interação apenas no cliente e pede para o abrires normalmente. Não força a abertura nem simula pacotes.
+3. O mod regista o baú com um nome livre como `Bau_1` e cancela essa interação apenas no cliente. Não força a abertura nem simula pacotes.
 4. Larga Shift e abre o baú. Apenas baús previamente registados podem receber snapshots.
-5. Usa `/chestcount list` para obter os identificadores completos. Podes usar um prefixo de UUID que distinga um único registo nos comandos de gestão.
+5. Usa `/cc list` para consultar os nomes. `/cc rename Bau_1 Minerios` permite passar imediatamente a usar `Minerios` em todos os comandos de gestão.
 
 O contorno azul aparece ao segurar uma bússola em qualquer mão. É desenhado com os gizmos vanilla de 26.3, com teste de profundidade: não é um efeito de visão através de paredes. Só considera baús carregados até 32 blocos, com limite de 256 contornos por frame. Um baú duplo tem uma única caixa.
 
-Mensagens traduzidas em inglês e português de Portugal, conforme o idioma do jogo. As datas são instantes UTC em formato ISO 8601. `—` significa que ainda não existe leitura conhecida; `⚠` assinala alteração estrutural observada.
+Mensagens traduzidas em inglês e português de Portugal, conforme o idioma do jogo. O chat usa coordenadas compactas e tempos relativos. UUIDs e datas UTC continuam no JSON; avisos de estrutura alterada permanecem visíveis em `info`.
 
 ## Comandos locais
 
+`/cc` e `/chestcount` partilham os mesmos handlers. [Referência completa e exemplos](docs/COMMANDS.md).
+
 | Comando | Função |
 | --- | --- |
-| `/chestcount` ou `/chestcount help` | Ajuda |
-| `/chestcount count` | Baús simples/duplos, quantidades, tipos de itens e datas das leituras |
-| `/chestcount list` | Todos os registos do mundo atual, IDs, coordenadas e datas |
-| `/chestcount location <nome>` | Correspondência de nome completo, sem distinguir maiúsculas; mostra todos os homónimos |
-| `/chestcount nearby [raio]` | Baús da dimensão atual por distância; raio padrão 32, máximo 4096 |
-| `/chestcount where <item>` | Pesquisa ID completo, ID vanilla sem namespace, fragmento de ID ou nome localizado exato |
-| `/chestcount info <id>` | Dados do registo e data da última sincronização |
-| `/chestcount rename <id> <nome>` | Altera o nome; aceita espaços, até 128 caracteres |
-| `/chestcount remove <id>` | Solicita confirmação válida durante 30 segundos |
-| `/chestcount remove <id> confirm` | Elimina apenas o registo local após confirmação |
-| `/chestcount reload` | Guarda alterações pendentes e recarrega configuração e dados; preserva memória em caso de falha |
+| `/cc help` | Ajuda |
+| `/cc count` | Total de baús, itens e tipos |
+| `/cc list [página]` | Nomes e coordenadas, 10 por página |
+| `/cc location <baú>` | Nome e coordenadas |
+| `/cc nearby [raio] [página]` | Distâncias na dimensão atual; raio padrão 32, máximo 4096 |
+| `/cc where <item> [página]` | Quantidade por baú; ID ou nome localizado do item |
+| `/cc info <baú>` | Posição, tipo, itens e tempo desde sincronização |
+| `/cc rename <baú> <nome>` | Renomeia imediatamente; 1–128 caracteres |
+| `/cc remove <baú> [confirm]` | Confirmação válida durante 30 segundos |
+| `/cc reload` | Guarda alterações pendentes e recarrega configuração e dados |
 
-Há sugestões para nomes, IDs de baús e IDs oficiais de itens. Uma pesquisa ambígua de itens apresenta opções, sem somar itens diferentes. Os totais usam apenas snapshots conhecidos, incluindo snapshots antigos assinalados como estruturalmente alterados. Nunca representam o inventário atual garantido.
+Identificadores: nome exato sem distinguir maiúsculas, UUID completo ou prefixo único. Nomes únicos em todas as dimensões do mesmo mundo, com espaços exteriores removidos e normalização Unicode NFC. Usa aspas para nomes com espaços, por exemplo `/cc rename Minerios "Baú de Minérios"`. `info` e `location` também conservam a pesquisa de nomes com espaços sem aspas. O autocomplete prefere nomes; duplicados antigos usam prefixos de UUID. Os dados antigos, incluindo nomes duplicados, não são migrados nem renomeados. Os totais são as últimas leituras conhecidas, incluindo snapshots antigos de estruturas alteradas; não são uma consulta em tempo real.
 
 ## Sincronização e limites de segurança
 
@@ -62,7 +63,7 @@ A associação exige um clique local recente (até 5 segundos), registo exato, e
 
 Se conheces o servidor e verificaste que os baús abrem inventários físicos normais, podes adicionar a sua chave `server:host[:porta]` a `trustedServers` em `config.json`. Isso aceita explicitamente a limitação da associação por clique/título/estrutura; não acrescenta qualquer protocolo ou instalação no servidor. Interfaces com título ou tamanho diferente continuam recusadas. O mod não sincroniza automaticamente menus arbitrários de plugins. Uma recusa pode resultar em baús registados sem itens, que continuam pesquisáveis por nome e posição.
 
-Os snapshots guardam o **último estado recebido em pacotes**. A previsão local de transferências pode não ser reenviada pelo servidor quando coincide com a previsão. Nessa situação a leitura pode ficar desatualizada até à próxima atualização completa; fecha e volta a abrir o baú para obter a leitura completa. Nenhum conteúdo fechado ou alteração de outro jogador fora da interface é observado. Itens são agregados por ID, sem distinguir componentes/NBT, encantamentos ou conteúdo de shulker boxes.
+Os snapshots guardam o **último estado recebido em pacotes**. Nos cliques reais de uma sessão associada, o mod envia uma revisão divergente (`stateId = -1`): o servidor vanilla executa a ação e responde com o estado completo, mesmo quando a previsão local estava correta. Não envia cliques adicionais nem guarda a previsão como confirmação. O fecho agenda a escrita e conserva a associação até 100 ticks para receber respostas em trânsito. Não existe um snapshot garantido no pacote de fecho. Se faltar uma confirmação, surge um aviso curto; reabre o baú. Consulta os detalhes e limites em [docs/SYNCHRONIZATION.md](docs/SYNCHRONIZATION.md). Nenhum conteúdo fechado ou alteração de outro jogador fora da interface é observado. Itens são agregados por ID, sem distinguir componentes/NBT, encantamentos ou conteúdo de shulker boxes.
 
 O mod observa alterações na estrutura de baús carregados. Ao juntar/separar baús ou destruir uma metade, assinala os registos antigos, preserva o snapshot e bloqueia novas sincronizações. Não tenta dividir ou somar snapshots, pois a ordem e os itens podem ter mudado. Usa `info`, confirma a remoção dos registos antigos e regista a estrutura atual. Clicar nas duas metades de um duplo produz a mesma identidade canónica. Proximidade isolada nunca cria uma associação.
 
@@ -81,7 +82,7 @@ backups/*-corrupt-*.json     originais danificados preservados durante recupera�
 
 Cada documento contém `formatVersion: 1`, identidade do mundo, UUIDs, nome, posições canónicas, dimensão, datas UTC, itens por slot e estado de alteração estrutural. O tipo simples/duplo deriva de um/dois blocos da identidade; não há um segundo campo redundante. As posições são ordenadas lexicograficamente, mas os slots mantêm a ordem recebida do servidor.
 
-Escritas são agrupadas a cada 2 segundos e na desconexão/saída, numa única thread de disco. Os documentos são substituídos por movimento atómico quando suportado. Um encerramento abrupto pode perder alterações ainda na fila. Leituras validam o documento completo antes de substituir o estado. JSON corrompido recupera da cópia `.bak`, preservando o original; sem backup válido, a carga falha e o mod recusa sobrescrever o ficheiro. Corrige o ficheiro e executa `reload`. Uma versão de formato desconhecida é recusada sem recuperação automática para um formato antigo. Não existem migrações na versão inicial; qualquer migração futura deve criar backup antes de converter.
+Escritas são agrupadas a cada 2 segundos e agendadas imediatamente no fecho, nas confirmações recebidas após fecho e na desconexão/saída, numa única thread de disco FIFO. Snapshots imutáveis enfileirados mantêm a ordem: uma escrita antiga não ultrapassa uma recente. Os documentos são substituídos por movimento atómico quando suportado. Um encerramento abrupto pode perder alterações ainda na fila. Leituras validam o documento completo antes de substituir o estado. JSON corrompido recupera da cópia `.bak`, preservando o original; sem backup válido, a carga falha e o mod recusa sobrescrever o ficheiro. Corrige o ficheiro e executa `reload`. Uma versão de formato desconhecida é recusada sem recuperação automática para um formato antigo. Não existem migrações na versão inicial; qualquer migração futura deve criar backup antes de converter.
 
 Configuração criada no primeiro arranque:
 

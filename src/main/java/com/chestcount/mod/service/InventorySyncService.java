@@ -17,6 +17,7 @@ public final class InventorySyncService {
     private final ChestCountClient app;
     private ChestIdentity pending, active;
     private BlockPos clicked;
+    private BlockPos pendingClicked;
     private String recordId;
     private long clickTick;
     private int container = -1;
@@ -24,26 +25,44 @@ public final class InventorySyncService {
     private boolean warned;
     private boolean verified;
     private long sequence;
+    private long closedAt = -1;
+    private int confirmations;
     public InventorySyncService(ChestCountClient app) { this.app = app; }
     public void clicked(ChestIdentity id, BlockPos pos) {
-        reset();
-        if (app.registry().exact(id).isPresent()) { pending = id; clicked = pos.immutable(); clickTick = app.ticks(); }
+        close();
+        pending = null;
+        if (app.registry().exact(id).isPresent()) { pending = id; pendingClicked = pos.immutable(); clickTick = app.ticks(); }
     }
     public void cancelPending() { pending = null; }
-    public void reset() { sequence++; pending = null; active = null; container = -1; confirmed = null; recordId = null; verified=false; }
+    public void reset() {
+        if (active != null && (confirmations > 0 || confirmed == null || !verified)) app.message("sync_incomplete");
+        sequence++; pending = null; active = null; container = -1; confirmed = null; recordId = null; verified=false; closedAt=-1; confirmations=0;
+    }
+    /** Keep the association briefly: responses to clicks can arrive after local close. */
+    public void close() {
+        if (active == null || closedAt >= 0) return;
+        closedAt = app.ticks();
+        if (valid()) save();
+        app.flush();
+    }
+    public boolean requestConfirmation(int menu) {
+        if (active == null || closedAt >= 0 || container != menu || !valid()) return false;
+        confirmations++; return true;
+    }
     public void open(ClientboundOpenScreenPacket packet) {
-        sequence++; active = null; confirmed = null; container = -1; verified=false;
-        var mc = app.mc(); var candidate = pending; pending = null;
+        if (active != null && (confirmations > 0 || confirmed == null || !verified)) app.message("sync_incomplete");
+        sequence++; active = null; confirmed = null; container = -1; verified=false; closedAt=-1; confirmations=0;
+        var mc = app.mc(); var candidate = pending; pending = null; clicked = pendingClicked;
         LOG.debug("Opening menu {} title={} candidate={} age={}",packet.getContainerId(),packet.getTitle(),candidate,app.ticks()-clickTick);
         if (candidate == null || mc.player == null || mc.level == null || mc.getConnection() == null || app.ticks()-clickTick > 100) return;
         var observed = ChestLocator.locate(mc,app.world(),clicked);
         if (observed.isEmpty() || !candidate.equals(observed.get()) || !(mc.player.containerMenu instanceof ChestMenu menu) || menu.getRowCount()*9 != candidate.slots()) {
-            LOG.warn("Skipped menu {}: chest structure or container type/size does not match",packet.getContainerId()); return;
+            LOG.warn("Skipped menu {}: chest structure or container type/size does not match",packet.getContainerId()); app.message("sync_incomplete"); return;
         }
         // The vanilla title must match the physical block's translated/custom display name.
         if (!(mc.level.getBlockEntity(clicked) instanceof ChestBlockEntity be) || !packet.getTitle().getString().equals(
                 be.hasCustomName() ? be.getDisplayName().getString() : net.minecraft.network.chat.Component.translatable(candidate.slots() == 54 ? "container.chestDouble" : "container.chest").getString())) {
-            LOG.warn("Skipped menu {}: title does not match the physical chest",packet.getContainerId()); return;
+            LOG.warn("Skipped menu {}: title does not match the physical chest",packet.getContainerId()); app.message("sync_incomplete"); return;
         }
         boolean trusted = mc.hasSingleplayerServer() || "vanilla".equals(mc.getConnection().serverBrand())
             || app.config().trustedServers.contains(app.world().split("\\|",2)[0]);
@@ -82,7 +101,8 @@ public final class InventorySyncService {
     private boolean valid() {
         var mc = app.mc();
         if (active == null || mc.player == null || mc.level == null || !active.world().equals(app.world())
-            || mc.player.containerMenu.containerId != container || !(mc.player.containerMenu instanceof ChestMenu)) return false;
+            || (closedAt < 0 && (mc.player.containerMenu.containerId != container || !(mc.player.containerMenu instanceof ChestMenu)))
+            || (closedAt >= 0 && app.ticks()-closedAt > 100)) return false;
         var observed = ChestLocator.locate(mc,app.world(),clicked);
         if (observed.isEmpty() || !observed.get().equals(active)) { reset(); return false; }
         return app.registry().exact(active).isPresent();
@@ -90,6 +110,7 @@ public final class InventorySyncService {
     public void content(ClientboundContainerSetContentPacket packet) {
         LOG.debug("Content menu {} expected={} items={} active={}",packet.containerId(),container,packet.items().size(),active);
         if (packet.containerId() != container || !valid() || packet.items().size() != active.slots()+36) return;
+        if (confirmed != null && confirmations > 0) confirmations--;
         confirmed = new ArrayList<>();
         for (int i=0;i<active.slots();i++) confirmed.add(packet.items().get(i).copy());
         save();
@@ -106,9 +127,11 @@ public final class InventorySyncService {
             if (!stack.isEmpty()) items.add(new ItemRecord(i,BuiltInRegistries.ITEM.getKey(stack.getItem()).toString(),stack.getCount()));
         }
         app.registry().snapshot(recordId,active,items);
+        if (closedAt >= 0) app.flush();
     }
     public void tick() {
         if (pending != null && app.ticks()-clickTick > 100) pending = null;
+        if (active != null && closedAt < 0 && app.mc().player != null && app.mc().player.containerMenu.containerId != container) close();
         if (active != null && !valid()) reset();
     }
 }

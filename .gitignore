@@ -45,3 +45,13 @@ desktop.ini
 *.log
 *.tmp
 *.bak
+* text=auto
+
+*.java text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.gradle text eol=lf
+*.properties text eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf

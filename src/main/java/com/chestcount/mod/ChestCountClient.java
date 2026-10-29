@@ -29,6 +29,7 @@ public final class ChestCountClient implements ClientModInitializer {
     private String world;
     private boolean ready;
     private long ticks, savedRevision, generation;
+    private long lastErrorTick = -200;
     public Minecraft mc() { return Minecraft.getInstance(); }
     public ModConfig config() { return config; }
     public ChestRegistryService registry() { return registry; }
@@ -70,8 +71,10 @@ public final class ChestCountClient implements ClientModInitializer {
                     if (observed.isPresent()) registry.observe(observed.get());
                     else if (!mc().level.getBlockState(bp).is(net.minecraft.world.level.block.Blocks.CHEST)) registry.invalidate(r.id());
                 }
-                if (!r.structureChanged() && registry.get(r.id(),world).structureChanged())
+                if (!r.structureChanged() && registry.get("uuid:"+r.id(),world).structureChanged()) {
                     LoggerFactory.getLogger("chestcount").warn("Chest {} changed structure; preserving snapshot and blocking synchronization",r.id());
+                    message("structure_changed");
+                }
             }
         }
     }
@@ -109,7 +112,9 @@ public final class ChestCountClient implements ClientModInitializer {
     }
     private void error(Exception e) {
         LoggerFactory.getLogger("chestcount").error("Storage operation failed",e);
-        mc().execute(() -> message("error",e.getMessage()));
+        mc().execute(() -> {
+            if (ticks-lastErrorTick >= 200) { lastErrorTick=ticks; message("error"); }
+        });
     }
     public void message(String key, Object... args) {
         if (mc().player == null) return;

@@ -17,14 +17,15 @@ public final class CompassInteractionHandler {
             if (player.isShiftKeyDown() && (player.getMainHandItem().is(Items.COMPASS) || player.getOffhandItem().is(Items.COMPASS))) {
                 try {
                     boolean existed = app.registry().all().stream().anyMatch(r -> r.identity().equals(identity.get()));
-                    app.registry().register(identity.get());
-                    app.message(existed ? "registered_already" : "registered");
+                    var record = app.registry().register(identity.get());
+                    if (!existed) app.message("registered",record.name());
                 } catch (RuntimeException e) { app.message("warning",e.getMessage()); }
                 app.sync().cancelPending();
                 // FAIL cancels locally without sending a packet or swinging. Open normally afterwards.
                 return InteractionResult.FAIL;
             }
             if (!player.isShiftKeyDown()) app.sync().clicked(identity.get(),hit.getBlockPos());
+            else app.sync().cancelPending();
             return InteractionResult.PASS;
         });
     }
