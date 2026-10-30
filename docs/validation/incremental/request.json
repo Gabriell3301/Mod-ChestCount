@@ -1,0 +1,45 @@
+{
+  "protocolVersion": 1,
+  "clientId": "8d9980e4-4b7d-4de4-b78c-b67ce6f0be8b",
+  "worldId": "integration-test:incremental:4f8c5a2e-11c9-4636-b665-3dd08a809e74",
+  "bootstrap": false,
+  "changes": [
+    {
+      "changeId": "e6a056aa-ad28-499c-9f07-979947b97f6f",
+      "clientId": "8d9980e4-4b7d-4de4-b78c-b67ce6f0be8b",
+      "worldId": "integration-test:incremental:4f8c5a2e-11c9-4636-b665-3dd08a809e74",
+      "chestId": "2d36006f-22f9-4fb5-8b09-a59170486b85",
+      "dimension": "minecraft:overworld",
+      "revision": 1,
+      "operation": "upsert",
+      "baseServerRevision": 0,
+      "data": {
+        "id": "2d36006f-22f9-4fb5-8b09-a59170486b85",
+        "identity": {
+          "world": "integration-test:incremental:4f8c5a2e-11c9-4636-b665-3dd08a809e74",
+          "dimension": "minecraft:overworld",
+          "blocks": [
+            {
+              "x": 100,
+              "y": 64,
+              "z": 200
+            }
+          ]
+        },
+        "name": "Integration test",
+        "createdAt": "2026-10-30T16:09:32.313956200Z",
+        "syncedAt": "2026-10-30T16:09:32.313956200Z",
+        "items": [
+          {
+            "slot": 0,
+            "item_id": "minecraft:diamond",
+            "count": 32
+          }
+        ],
+        "structureChanged": false
+      },
+      "createdAt": "2026-10-30T16:09:32.314960Z",
+      "status": "sent"
+    }
+  ]
+}

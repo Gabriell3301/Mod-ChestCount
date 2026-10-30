@@ -1,0 +1,14 @@
+{
+  "unit": {
+    "tests": 113,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "newTests": 30,
+  "build": "passed",
+  "clientGameTest": "passed",
+  "physicalInventory": "unchanged by recovery; asserted in temporary integrated world",
+  "serverContract": "unchanged",
+  "jarSha256": "82530372293011d259cb571455a160c81b995167b98607bd5072114af15c2fd5"
+}

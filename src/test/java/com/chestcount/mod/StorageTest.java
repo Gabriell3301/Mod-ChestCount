@@ -39,4 +39,9 @@ class StorageTest {
     @Test void futureFormatIsPreserved() throws Exception { var s=new JsonStorageService(temp); s.save("world",data()); var text=Files.readString(s.file("world")).replace("\"formatVersion\": 1","\"formatVersion\": 99"); Files.writeString(s.file("world"),text); assertThrows(java.io.IOException.class,() -> s.load("world")); assertEquals(text,Files.readString(s.file("world"))); }
     @Test void externalCorruptionBlocksSave() throws Exception { var s=new JsonStorageService(temp); s.save("world",data()); Files.writeString(s.file("world"),"null"); assertThrows(java.io.IOException.class,() -> s.save("world",List.of())); assertEquals("null",Files.readString(s.file("world"))); }
     @Test void futureVersionDoesNotFallBackToOldBackup() throws Exception { var s=new JsonStorageService(temp); s.save("world",data()); s.save("world",data()); var text=Files.readString(s.file("world")).replace("\"formatVersion\": 1","\"formatVersion\": 2"); Files.writeString(s.file("world"),text); assertThrows(java.io.IOException.class,() -> s.load("world")); assertEquals(text,Files.readString(s.file("world"))); }
+    @Test void futureFormatWithDifferentShapeNeverFallsBack() throws Exception {
+        var storage=new JsonStorageService(temp); storage.save("world",data()); storage.save("world",data());
+        String future="{\"formatVersion\":2,\"newSchema\":true}"; Files.writeString(storage.file("world"),future);
+        assertThrows(java.io.IOException.class,() -> storage.load("world")); assertEquals(future,Files.readString(storage.file("world")));
+    }
 }

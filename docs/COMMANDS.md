@@ -30,3 +30,11 @@ Nomes que colidam com o UUID/prefixo de outro registo são recusados. Nos dados 
 `info` e `location` conservam nomes com espaços sem aspas. Em `rename` e `remove`, usa aspas no identificador que contém espaços; o novo nome em `rename` continua a aceitar espaços sem aspas. A confirmação de remoção inclui um identificador seguro, já entre aspas, e expira em 30 segundos.
 
 As quantidades refletem a última confirmação conhecida, não inventários fechados em tempo real. `info` avisa quando ainda não existe snapshot ou a estrutura mudou. UUIDs, dimensões e datas completas continuam disponíveis no JSON para diagnóstico.
+
+## HTTP
+
+`/cc sync`, `/cc sync status`, `/cc sync on`, `/cc sync off`: ver [HTTP-SYNC.md](HTTP-SYNC.md). Os comandos existentes continuam disponíveis.
+
+## Backups, exportação e importação
+
+`/cc backup`, `/cc backup list`, `/cc export`, `/cc import ficheiro.json` e `/cc import ficheiro.json confirm`. A importação lê apenas `config/chestcount/imports/`, valida o mundo e faz backup antes de aplicar um merge por UUID. A confirmação exige pré-visualização atual. Ver [guia completo](INCREMENTAL-SYNC.md).

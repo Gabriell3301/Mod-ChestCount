@@ -4,5 +4,22 @@
   "outlineRadius": 32,
   "nearbyRadius": 32,
   "trustedServers": [],
-  "worldAliases": {}
+  "worldAliases": {},
+  "sync": {
+    "enabled": true,
+    "endpoint": "http://127.0.0.1:8080/api/v1/sync",
+    "automatic": true,
+    "intervalSeconds": 30,
+    "connectTimeoutSeconds": 5,
+    "requestTimeoutSeconds": 10,
+    "debounceSeconds": 3,
+    "retryInitialSeconds": 5,
+    "retryMaxSeconds": 300
+  },
+  "backup": {
+    "enabled": true,
+    "intervalMinutes": 5,
+    "onlyWhenChanged": true,
+    "maxAutomaticBackupsPerWorld": 10
+  }
 }

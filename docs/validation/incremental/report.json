@@ -1,0 +1,31 @@
+{
+  "worldId": "integration-test:incremental:4f8c5a2e-11c9-4636-b665-3dd08a809e74",
+  "success": true,
+  "checks": [
+    "Health after start PID 2056",
+    "Java outbox creates chest with 32 diamonds",
+    "Java outbox updates same chest to 48 diamonds",
+    "SQLite consolidates one chest instead of request files",
+    "Rename uses incremental operation",
+    "Rename persisted without replacing inventory",
+    "Repeated original change returns duplicate",
+    "Duplicate does not increment server revision",
+    "Removal queues delete",
+    "Logical delete retains tombstone",
+    "Stopped owned Chest Count server PID 2056",
+    "Offline request retained durably",
+    "Health after start PID 12580",
+    "Restart recovers queue and automatic retry",
+    "Only confirmed changes removed from queue",
+    "Full backup after simulated five-minute interval",
+    "Export/import validation, confirmation and pre-import backup",
+    "Manual backup survives automatic retention",
+    "Server export excludes tombstones from active chest list",
+    "Global change cursor is paginated",
+    "Stopped owned Chest Count server PID 12580",
+    "Health after start PID 7468",
+    "Tombstone persists after second Python restart",
+    "All pre-existing server JSONs unchanged"
+  ],
+  "localArtifacts": "C:\\Users\\2025168383\\Desktop\\Mod-ChestCount\\build\\real-integration\\08574a20-9f6a-458b-a340-b114d9fc9f27"
+}

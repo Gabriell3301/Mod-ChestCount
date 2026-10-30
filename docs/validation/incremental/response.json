@@ -1,0 +1,13 @@
+{
+  "success": true,
+  "protocolVersion": 1,
+  "results": [
+    {
+      "changeId": "e6a056aa-ad28-499c-9f07-979947b97f6f",
+      "chestId": "2d36006f-22f9-4fb5-8b09-a59170486b85",
+      "revision": 1,
+      "serverRevision": 1,
+      "status": "applied"
+    }
+  ]
+}

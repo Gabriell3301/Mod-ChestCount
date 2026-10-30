@@ -22,3 +22,10 @@ fabricApi {
         enableClientGameTests = true
     }
 }
+
+// Explicit integration runner: starts/stops only its own Chest Count Python children.
+tasks.register('realSyncIntegration', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.chestcount.mod.RealSyncIntegration'
+}

@@ -36,7 +36,7 @@ public final class ChestOutlineRenderer {
         LevelExtractionEvents.END_EXTRACTION.register(context -> {
             var mc=app.mc();
             if (!app.ready() || app.world()==null || mc.player==null || mc.level==null || !mc.level.dimension().identifier().toString().equals(dimension[0]) || revision[0]!=app.registry().revision()) return;
-            if (!app.config().alwaysShowOutlines && !mc.player.getMainHandItem().is(Items.COMPASS) && !mc.player.getOffhandItem().is(Items.COMPASS)) return;
+            if (!app.config().alwaysShowOutlines && !mc.player.getMainHandItem().is(Items.FEATHER) && !mc.player.getOffhandItem().is(Items.FEATHER)) return;
             try (var collection=mc.levelExtractor.collectPerFrameMainThreadGizmos()) {
                 for(var box:boxes) {
                     var min=net.minecraft.core.BlockPos.containing(box.minX,box.minY,box.minZ);

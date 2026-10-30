@@ -1,0 +1,60 @@
+{
+  "formatVersion": 1,
+  "world": "integration-test:incremental:4f8c5a2e-11c9-4636-b665-3dd08a809e74",
+  "chests": [
+    {
+      "createdAt": "2026-10-30T16:09:32.313956200Z",
+      "id": "2d36006f-22f9-4fb5-8b09-a59170486b85",
+      "identity": {
+        "blocks": [
+          {
+            "x": 100,
+            "y": 64,
+            "z": 200
+          }
+        ],
+        "dimension": "minecraft:overworld",
+        "world": "integration-test:incremental:4f8c5a2e-11c9-4636-b665-3dd08a809e74"
+      },
+      "items": [
+        {
+          "count": 32,
+          "item_id": "minecraft:diamond",
+          "slot": 0
+        }
+      ],
+      "name": "Integration test",
+      "structureChanged": false,
+      "syncedAt": "2026-10-30T16:09:32.313956200Z"
+    }
+  ],
+  "tombstones": [
+    {
+      "createdAt": "2026-10-30T16:09:31.546819Z",
+      "id": "6a56282f-45a8-4370-a4eb-ba061df8b920",
+      "identity": {
+        "blocks": [
+          {
+            "x": 100,
+            "y": 64,
+            "z": 200
+          }
+        ],
+        "dimension": "minecraft:overworld",
+        "world": "integration-test:incremental:4f8c5a2e-11c9-4636-b665-3dd08a809e74"
+      },
+      "items": [
+        {
+          "count": 48,
+          "item_id": "minecraft:diamond",
+          "slot": 0
+        }
+      ],
+      "name": "Renamed integration chest",
+      "structureChanged": false,
+      "syncedAt": "2026-10-30T16:09:32.169957200Z",
+      "serverRevision": 4,
+      "deleted": true
+    }
+  ]
+}

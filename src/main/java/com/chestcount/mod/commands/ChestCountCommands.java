@@ -109,6 +109,17 @@ public final class ChestCountCommands {
                 page(app,results,number,"/cc where "+item+" ",m -> app.line("• "+m.chest().name()+" — ×"+m.count()+" "+position(m.chest())));
                 warnIncomplete(app);
             }))));
+            root.then(literal("sync").executes(c -> { app.manualSync(); return 1; })
+                .then(literal("status").executes(c -> { app.syncStatus(); return 1; }))
+                .then(literal("on").executes(c -> { app.automaticSync(true); return 1; }))
+                .then(literal("off").executes(c -> { app.automaticSync(false); return 1; })));
+            root.then(literal("backup").executes(c -> { app.archiveCommand("backup",null,false); return 1; })
+                .then(literal("list").executes(c -> { app.archiveCommand("list",null,false); return 1; })));
+            root.then(literal("export").executes(c -> { app.archiveCommand("export",null,false); return 1; }));
+            root.then(literal("import").then(argument("file",StringArgumentType.word()).suggests((c,b) -> {
+                app.importSuggestions().stream().filter(f -> f.startsWith(b.getRemaining())).forEach(b::suggest); return b.buildFuture();
+            }).executes(c -> { app.archiveCommand("import",str(c,"file"),false); return 1; })
+                .then(literal("confirm").executes(c -> { app.archiveCommand("import",str(c,"file"),true); return 1; }))));
             root.then(literal("reload").executes(c -> { app.reload(); return 1; }));
             var node=dispatcher.register(root);
             dispatcher.register(literal("cc").executes(c -> help(app)).redirect(node));

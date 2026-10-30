@@ -1,3 +1,5 @@
+> A versão atual usa protocolo incremental `/api/v1/sync`, backups automáticos e import/export. Consulta [o guia completo](docs/INCREMENTAL-SYNC.md); as secções da primeira integração HTTP abaixo ficam como contexto histórico.
+
 # Chest Count
 
 Mod **exclusivamente client-side** para Minecraft Java **26.3**, Fabric Loader **0.20.1+** e Fabric API **0.165.0+26.3**. Java **25 ou superior**. Não precisa de instalação no servidor, permissões de operador, comandos administrativos ou pacotes personalizados.
@@ -26,13 +28,13 @@ Versões verificadas em 28/10/2026 nas fontes oficiais:
 
 ## Utilização
 
-1. Segura uma **bússola vanilla numa das mãos**.
+1. Segura uma **pena vanilla numa das mãos**.
 2. Faz **Shift + botão direito** num baú normal. Baús armadilhados e ender chests estão excluídos.
 3. O mod regista o baú com um nome livre como `Bau_1` e cancela essa interação apenas no cliente. Não força a abertura nem simula pacotes.
 4. Larga Shift e abre o baú. Apenas baús previamente registados podem receber snapshots.
 5. Usa `/cc list` para consultar os nomes. `/cc rename Bau_1 Minerios` permite passar imediatamente a usar `Minerios` em todos os comandos de gestão.
 
-O contorno azul aparece ao segurar uma bússola em qualquer mão. É desenhado com os gizmos vanilla de 26.3, com teste de profundidade: não é um efeito de visão através de paredes. Só considera baús carregados até 32 blocos, com limite de 256 contornos por frame. Um baú duplo tem uma única caixa.
+O contorno azul aparece ao segurar uma pena em qualquer mão. É desenhado com os gizmos vanilla de 26.3, com teste de profundidade: não é um efeito de visão através de paredes. Só considera baús carregados até 32 blocos, com limite de 256 contornos por frame. Um baú duplo tem uma única caixa.
 
 Mensagens traduzidas em inglês e português de Portugal, conforme o idioma do jogo. O chat usa coordenadas compactas e tempos relativos. UUIDs e datas UTC continuam no JSON; avisos de estrutura alterada permanecem visíveis em `info`.
 
@@ -71,9 +73,10 @@ Destruição e substituição de um baú enquanto o chunk está descarregado nã
 
 ## Mundos, armazenamento e configuração
 
-Tudo fica em `config/chestcount/`, relativo à instância Minecraft, sem envio para serviços externos:
+Tudo fica em `config/chestcount/`, relativo à instância Minecraft, com envio HTTP opcional para o endpoint configurado:
 
 ```text
+outbox/<sha256>.json         fila HTTP persistente e confirmações
 config.json                 opções e aliases manuais
 worlds/<sha256>.json         documento por identidade de mundo, incluindo todas as dimensões
 worlds/<sha256>.json.bak     versão anterior válida, antes de cada substituição
@@ -93,7 +96,15 @@ Configuração criada no primeiro arranque:
   "outlineRadius": 32,
   "nearbyRadius": 32,
   "trustedServers": [],
-  "worldAliases": {}
+  "worldAliases": {},
+  "sync": {
+    "enabled": true,
+    "endpoint": "http://127.0.0.1:8080/api/sync",
+    "automatic": true,
+    "intervalSeconds": 30,
+    "connectTimeoutSeconds": 5,
+    "requestTimeoutSeconds": 10
+  }
 }
 ```
 
@@ -114,11 +125,11 @@ Muda o alias e recarrega ao mudar de mundo lógico; não existe deteção autom�
 - `model`: identidades canónicas e snapshots imutáveis, sem dependências Minecraft.
 - `service`: registo, pesquisa, política de associação e sincronização de pacotes.
 - `storage`: JSON validado, backups e substituição atómica.
-- `interaction`: bússola e validação das duas metades do baú.
+- `interaction`: pena e validação das duas metades do baú.
 - `commands` e `rendering`: integrações Fabric client-side.
-- `integration/SyncProvider`: contrato futuro independente do armazenamento. Não há implementação REST nem endpoints fictícios.
+- `integration/SyncProvider`, `HttpSyncProvider` e `HttpSyncQueue`: transporte HTTP e fila persistente por mundo, independentes do inventário.
 
-Uma futura integração Yii2 deverá implementar associação de contas, armazenamento de tokens no cofre do sistema operativo, mapeamento explícito de mundos partilhados, fila persistente offline, revisões idempotentes e resolução de conflitos antes de ativar envios. O JSON atual pode continuar como cache offline. Não são implementadas autenticação nem uma fila remota nesta versão.
+A integração HTTP envia documentos completos do mundo para um servidor configurável. Não implementa autenticação, conflitos ou alterações remotas. Ver [guia HTTP](docs/HTTP-SYNC.md) para configuração, comandos, funcionamento offline e futura API Yii2.
 
 ## Validação
 
@@ -132,3 +143,22 @@ Testes unitários em `src/test/java`: registo simples/duplo, canonicalização, 
 `src/gametest` contém um teste de integração separado do JAR final. `runClientGameTest` abre um cliente e um servidor integrado reais num mundo temporário dentro de `build/run/clientGameTest`, testa pacotes/interface/estrutura e termina automaticamente. Precisa de ambiente gráfico e descarrega os recursos oficiais do jogo. O diretório temporário do teste é recriado pela tarefa; não usa os teus mundos em `run/saves` ou noutras instâncias. Capturas ficam em `build/run/clientGameTest/screenshots`.
 
 O roteiro de testes dentro do jogo está em [docs/MANUAL-TESTS.md](docs/MANUAL-TESTS.md). Consulta [docs/VALIDATION.md](docs/VALIDATION.md) para os resultados realmente executados neste ambiente.
+
+## HTTP automático
+
+Por defeito, envia para `http://127.0.0.1:8080/api/sync` após fechar um baú confirmado e agrupar as alterações durante cerca de 2 segundos. O ficheiro `config/chestcount/config.json` aceita `sync.enabled`, `endpoint`, `automatic`, `intervalSeconds`, `connectTimeoutSeconds` e `requestTimeoutSeconds`.
+
+- `/cc sync`: tentativa manual, com resultado apenas depois da resposta HTTP.
+- `/cc sync status`: endpoint, estado pendente e tempo desde o último envio.
+- `/cc sync on` e `/cc sync off`: ativar/desativar o modo automático, com persistência.
+- `/cc reload`: recarregar endpoint e restantes opções sem recompilar.
+
+A fila `outbox/<sha256>.json` preserva a versão mais recente por mundo e a confirmação HTTP correspondente. Falhas mantêm os dados pendentes e originam retries limitados, sem mensagens automáticas repetitivas no chat. Consulta [docs/HTTP-SYNC.md](docs/HTTP-SYNC.md).
+
+## Backups e protocolo incremental atual
+
+O estado local é guardado quando muda; backups completos independentes são criados a cada cinco minutos quando há alterações, com retenção de dez automáticos. `/cc backup`, `/cc backup list`, `/cc export` e `/cc import <ficheiro> [confirm]` completam a administração local.
+
+O endpoint atual é `http://127.0.0.1:8080/api/v1/sync`. Envia apenas alterações por UUID, com fila persistente, revisões locais e do servidor, idempotência, bootstrap e diagnóstico de conflitos. O servidor Python consolida em SQLite. Ver [configuração completa](docs/config.example.json), [arquitetura e operação](docs/INCREMENTAL-SYNC.md) e [validação](docs/VALIDATION.md).
+
+Conflitos de inventário podem ser recuperados reabrindo e fechando o baú, com nova leitura confirmada e base remota atualizada. [Regras e proteções](docs/INVENTORY-CONFLICT-RECOVERY.md).

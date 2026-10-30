@@ -1,0 +1,31 @@
+{
+  "formatVersion": 1,
+  "world": "integration-test:http-sync:8ed4063a-af03-478a-ae4f-e347dcf9a323",
+  "chests": [
+    {
+      "id": "47dfcd3b-5f4a-487a-8190-feb1c9d13f46",
+      "name": "Controlled HTTP integration test - not a Minecraft world",
+      "identity": {
+        "world": "integration-test:http-sync:8ed4063a-af03-478a-ae4f-e347dcf9a323",
+        "dimension": "minecraft:overworld",
+        "blocks": [
+          {
+            "x": 0,
+            "y": 64,
+            "z": 0
+          }
+        ]
+      },
+      "createdAt": "2026-10-30T15:09:45.186550Z",
+      "syncedAt": "2026-10-30T15:09:45.186550Z",
+      "items": [
+        {
+          "slot": 0,
+          "item_id": "minecraft:diamond",
+          "count": 1
+        }
+      ],
+      "structureChanged": false
+    }
+  ]
+}

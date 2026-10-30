@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.chestcount.mod.InventoryConflictRecoveryTest" tests="23" skipped="0" failures="0" errors="0" timestamp="2026-10-30T16:44:20.398Z" hostname="C2-LAI4-M14" time="3.329">
+  <properties/>
+  <testcase name="anotherConflictRequiresAnotherOpeningAndDoesNotOverwriteAnything()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.203"/>
+  <testcase name="tombstoneIsNeverResurrected()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.089"/>
+  <testcase name="renameDeleteAndStructureConflictsRequireExplicitResolution()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.177"/>
+  <testcase name="preparedRecoverySurvivesRestartAndClearsOldConflictOnAck()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.112"/>
+  <testcase name="disabledAutomaticSyncDefersLookupUntilEnabled()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.107"/>
+  <testcase name="foreignIdentityIsNeverAccepted()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.086"/>
+  <testcase name="manualAttemptWaitsForLookupWithoutBlockingThread()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.104"/>
+  <testcase name="ordinaryReleaseOrUnpersistedSnapshotCannotTriggerRecovery()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.097"/>
+  <testcase name="lookupFailureIsOneAttemptPerOpeningAndConflictSurvives()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.12"/>
+  <testcase name="localStructureIsNotRecoveredAsInventory()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.073"/>
+  <testcase name="reopeningWithoutANewAuthoritativeSnapshotDoesNotRecover()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.068"/>
+  <testcase name="lateAuthoritativeConfirmationDuringLookupUsesNewestPersistedSnapshot()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.109"/>
+  <testcase name="localRenameIsNotRecoveredAsInventory()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.078"/>
+  <testcase name="reopenConfirmedSnapshotRebasesWithNewIdAndClearsOnlyAfterAcceptance()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.094"/>
+  <testcase name="remoteRenameIsNeverOverwritten()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.082"/>
+  <testcase name="openingBeforeConflictDoesNotAuthorizeRecoveryAfterwards()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.101"/>
+  <testcase name="serverRenameAfterLookupCausesConflictInsteadOfOverwrite()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.098"/>
+  <testcase name="newConfirmationWithUnchangedItemsStillRecovers()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.094"/>
+  <testcase name="timeoutDoesNotFreezeOtherChests()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="1.079"/>
+  <testcase name="otherChestsKeepSyncingAndConflictDoesNotLoop()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.075"/>
+  <testcase name="malformedLookupCannotRebase()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.078"/>
+  <testcase name="newerEditsAfterRecoveryPreparationRemainPendingAfterOldAck()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.111"/>
+  <testcase name="remoteStructuralFlagIsNeverCleared()" classname="com.chestcount.mod.InventoryConflictRecoveryTest" time="0.077"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

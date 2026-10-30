@@ -27,8 +27,12 @@ Não foi alterado o formato JSON 1: UUIDs, nomes antigos, identidades, posiçõe
 - Uma abertura fechada antes de a verificação física integrada terminar pode ser recusada conservadoramente. Callbacks antigos não recuperam sessões já substituídas.
 - Não se observam alterações enquanto o baú está fechado. Reabrir recebe um snapshot completo.
 - Marca vanilla, título e geometria não provam a identidade de menus de servidores que imitem o vanilla. Mantêm-se `trustedServers`, proteção estrutural e os limites de identificação de mundos descritos no README.
-- Não existe mod no servidor, REST ou integração Yii2 implementada. A arquitetura e o contrato futuro permanecem.
+- Não existe mod no servidor nem API Yii2 implementada. O envio HTTP dos snapshots confirmados está descrito em [HTTP-SYNC.md](HTTP-SYNC.md).
 
 ## Validação
 
 O GameTest usa cliente, mixins, pacotes e servidor integrado reais: abertura, primeiro snapshot, alterações do servidor, Shift+Click, retirar/colocar, troca por hotbar, fecho no mesmo tick do último clique, gravação automática e reabertura. Também verifica baús duplos, exclusão de itens do jogador e invalidação estrutural. A leitura do JSON é verificada antes de executar comandos de gestão. O roteiro manual acrescenta latência, interrupção de ligação, arrastar e servidor multiplayer externo.
+
+## Evolução HTTP
+
+A confirmação vanilla descrita acima alimenta agora a [fila incremental](INCREMENTAL-SYNC.md), com bloqueios por UUID, backups independentes e servidor SQLite. A outbox de documentos completos foi preservada como legado.

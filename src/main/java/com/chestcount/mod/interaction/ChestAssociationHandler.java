@@ -6,7 +6,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.InteractionHand;
 
-public final class CompassInteractionHandler {
+public final class ChestAssociationHandler {
     public static void register(ChestCountClient app) {
         UseBlockCallback.EVENT.register((player,level,hand,hit) -> {
             if (!level.isClientSide() || player.isSpectator() || hand != InteractionHand.MAIN_HAND) return InteractionResult.PASS;
@@ -14,7 +14,7 @@ public final class CompassInteractionHandler {
             var identity = ChestLocator.locate(app.mc(),app.world(),hit.getBlockPos());
             if (identity.isEmpty()) { app.sync().cancelPending(); return InteractionResult.PASS; }
             app.registry().observe(identity.get());
-            if (player.isShiftKeyDown() && (player.getMainHandItem().is(Items.COMPASS) || player.getOffhandItem().is(Items.COMPASS))) {
+            if (player.isShiftKeyDown() && (player.getMainHandItem().is(Items.FEATHER) || player.getOffhandItem().is(Items.FEATHER))) {
                 try {
                     boolean existed = app.registry().all().stream().anyMatch(r -> r.identity().equals(identity.get()));
                     var record = app.registry().register(identity.get());

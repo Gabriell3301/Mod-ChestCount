@@ -47,7 +47,7 @@ public final class InventorySyncService {
     }
     public boolean requestConfirmation(int menu) {
         if (active == null || closedAt >= 0 || container != menu || !valid()) return false;
-        confirmations++; return true;
+        confirmations++; app.inventoryPending(recordId); return true;
     }
     public void open(ClientboundOpenScreenPacket packet) {
         if (active != null && (confirmations > 0 || confirmed == null || !verified)) app.message("sync_incomplete");
@@ -71,6 +71,7 @@ public final class InventorySyncService {
         LOG.debug("Trust={} record={}",trusted,r.map(ChestRecord::id));
         if (r.isEmpty()) return;
         active = candidate; recordId = r.get().id(); container = packet.getContainerId();
+        app.inventoryOpened(recordId);
         verified=!mc.hasSingleplayerServer();
         if (!verified) {
             var playerId=mc.player.getUUID(); var expectedContainer=container; var token=sequence;
@@ -127,8 +128,10 @@ public final class InventorySyncService {
             if (!stack.isEmpty()) items.add(new ItemRecord(i,BuiltInRegistries.ITEM.getKey(stack.getItem()).toString(),stack.getCount()));
         }
         app.registry().snapshot(recordId,active,items);
-        if (closedAt >= 0) app.flush();
+        if (closedAt >= 0) { app.flush(); if (verified && confirmations == 0) app.inventoryFinalized(recordId); }
     }
+    /** Only closed, verified snapshots with no outstanding confirmations may leave the client. */
+    public boolean uploadSafe() { return active == null || closedAt >= 0 && confirmed != null && verified && confirmations == 0; }
     public void tick() {
         if (pending != null && app.ticks()-clickTick > 100) pending = null;
         if (active != null && closedAt < 0 && app.mc().player != null && app.mc().player.containerMenu.containerId != container) close();

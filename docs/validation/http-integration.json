@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-10-30T15:09:45.186550Z",
+  "endpoint": "http://127.0.0.1:8080/api/sync",
+  "status": 200,
+  "response": {
+    "success": true,
+    "received": 1
+  },
+  "testWorld": "integration-test:http-sync:8ed4063a-af03-478a-ae4f-e347dcf9a323",
+  "newMatchingFiles": [
+    "C:\\ChestCount-Server\\data\\sync_20261030_150945_243338.json"
+  ],
+  "previousFilesUnchanged": true
+}

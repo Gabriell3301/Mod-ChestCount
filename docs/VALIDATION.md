@@ -94,3 +94,25 @@ Permanecem avisos de APIs obsoletas e avisos Gradle relativos a compatibilidade 
 - Outros drivers, shaders e mods de renderização.
 
 O [roteiro manual](MANUAL-TESTS.md) mantém os cenários a completar. As limitações da associação de menus, snapshots baseados em pacotes, identidade por pasta/endereço e autorização de servidores estão detalhadas no README.
+
+## HTTP - 30/10/2026
+
+Implementação validada com `./gradlew.bat --gradle-user-home .gradle-home test build runClientGameTest`: BUILD SUCCESSFUL. Executa as tarefas test, build e Client GameTest na mesma invocação.
+
+- Testes unitários: 57, falhas 0, erros 0, ignorados 0.
+- Client GameTest: cliente gráfico e servidor Minecraft integrado reais num mundo temporário; fecho com confirmação tardia, persistência, receção HTTP automática numa porta dinâmica e comandos novos/existentes. Sem acesso a mundos reais nem à porta 8080 durante os testes.
+- Build: `build/libs/chest-count-1.0.0.jar`.
+- Servidor Python existente: pedido POST controlado, HTTP 200 e resposta `{"success":true,"received":1}`. Novo ficheiro: `C:\ChestCount-Server\data\sync_20261030_150945_243338.json`. Hashes de todos os JSONs anteriores comparados antes/depois, sem alterações.
+- Evidência: [resposta e verificação](validation/http-integration.json), [payload isolado de teste](validation/http-integration-payload.json).
+
+O pedido Python isolado verifica o contrato e o armazenamento do servidor existente; o percurso completo Minecraft -> armazenamento -> HTTP foi validado separadamente pelo Client GameTest. Não se testou uma sessão do utilizador num mundo real contra o servidor Python, nem a futura API Yii2. Os testes de timeout/retry/offline usam exclusivamente servidores temporários.
+
+Nenhum git add/commit/push, alteração de remotes, modificação/reinício do servidor Python ou alteração dos seus JSONs existentes. Sem dependências novas. O processo Minecraft do GameTest termina pelo seu ciclo normal.
+
+## Sistema incremental, backups e pena - 30/10/2026
+
+A implementação atual e os resultados completos estão em [IMPLEMENTATION-REPORT.md](IMPLEMENTATION-REPORT.md). As referências a bússola nas validações anteriores acima são históricas; o GameTest atual confirma pena nas duas mãos e que a bússola deixou de associar baús. Foram preservados os testes anteriores e os JSONs do servidor.
+
+## Recuperação de conflitos de inventário - 30/10/2026
+
+113 testes unitários passaram (30 novos), build e Client GameTest gráfico passaram. O GameTest inclui conflito persistido, reabertura real, snapshot confirmado, GET da revisão e limpeza do conflito apenas após aceitação, com inventário físico intacto. Uma falha transitória de escrita encontrada durante a validação foi corrigida conservando a finalização pendente até a escrita correta. Ver [regras e resultados](INVENTORY-CONFLICT-RECOVERY.md) e [evidência](validation/inventory-conflict-recovery/results.json).
