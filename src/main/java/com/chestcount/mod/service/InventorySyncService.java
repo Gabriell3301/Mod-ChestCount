@@ -11,7 +11,12 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import java.util.*;
 
-/** Only packet-confirmed slots are stored. Never samples the predicted UI inventory. */
+/**
+ * Associa pacotes de menus e slots a um baú físico previamente identificado.
+ *
+ * Confirma estrutura e origem do menu antes de observar itens; o envio fica retido
+ * até fecho, verificação e ausência de confirmações pendentes.
+ */
 public final class InventorySyncService {
     private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger("chestcount");
     private final ChestCountClient app;
@@ -29,6 +34,9 @@ public final class InventorySyncService {
     private int confirmations;
     public InventorySyncService(ChestCountClient app) { this.app = app; }
     public void clicked(ChestIdentity id, BlockPos pos) {
+    /**
+     * Conserva brevemente a associação após fechar, pois ainda podem chegar respostas a cliques.
+     */
         close();
         pending = null;
         if (app.registry().exact(id).isPresent()) { pending = id; pendingClicked = pos.immutable(); clickTick = app.ticks(); }
@@ -130,7 +138,9 @@ public final class InventorySyncService {
         app.registry().snapshot(recordId,active,items);
         if (closedAt >= 0) { app.flush(); if (verified && confirmations == 0) app.inventoryFinalized(recordId); }
     }
-    /** Only closed, verified snapshots with no outstanding confirmations may leave the client. */
+    /**
+     * Autoriza o envio apenas após fecho e verificação, sem confirmações de inventário pendentes.
+     */
     public boolean uploadSafe() { return active == null || closedAt >= 0 && confirmed != null && verified && confirmations == 0; }
     public void tick() {
         if (pending != null && app.ticks()-clickTick > 100) pending = null;

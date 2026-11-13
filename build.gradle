@@ -12,7 +12,11 @@ dependencies {
 tasks.withType(JavaCompile).configureEach { options.release = 25; options.encoding = 'UTF-8' }
 java { withSourcesJar() }
 jar { from('LICENSE') }
-test { useJUnitPlatform() }
+test {
+    useJUnitPlatform()
+    // Synthetic credential for local HTTP test servers; never use a developer's launcher secret.
+    environment 'CHESTCOUNT_API_TOKEN', 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+}
 processResources { filesMatching('fabric.mod.json') { expand version: project.version } }
 fabricApi {
     configureTests {
@@ -28,4 +32,10 @@ tasks.register('realSyncIntegration', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
     mainClass = 'com.chestcount.mod.RealSyncIntegration'
+}
+tasks.register('yiiSyncIntegration', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.chestcount.mod.YiiSyncIntegration'
+    args providers.gradleProperty('fixture').getOrElse('../Dados-ChestCount/.work/minecraft-integration.json')
 }

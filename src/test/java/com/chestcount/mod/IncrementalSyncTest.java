@@ -90,6 +90,95 @@ class IncrementalSyncTest {
         Path file; try(var paths=Files.walk(temp.resolve("incremental"))) { file=paths.filter(p -> p.toString().endsWith(".json")).findFirst().orElseThrow(); }
         Files.writeString(file,"{bad"); try(var q=queue()) { assertEquals(1,q.pending("local:test").size()); } assertTrue(Files.readString(file).contains("formatVersion"));
     }
+    @Test void emptyWorldBootstrapAndNameUpdateWithoutChests() throws Exception {
+        try(var q=queue()) {
+            q.worldName("local:test","Mundo original"); q.update(doc());
+            assertEquals(0,await(q.attempt("local:test",config,true))); assertEquals(1,calls.get());
+            assertEquals("Mundo original",new Gson().fromJson(body.get(),SyncProtocol.Request.class).worldName());
+            await(q.attempt("local:test",config,true)); assertEquals(1,calls.get());
+            q.worldName("local:test","Nome novo"); await(q.attempt("local:test",config,true)); assertEquals(2,calls.get());
+        }
+    }
+    @Test void unobservedChestSendsExplicitNull() throws Exception {
+        var a=chest("local:test");
+        var unknown=new ChestRecord(a.id(),a.identity(),a.name(),a.createdAt(),null,List.of(),false);
+        try(var q=queue()) {
+            q.update(doc(unknown)); await(q.attempt("local:test",config,true));
+            var data=JsonParser.parseString(body.get()).getAsJsonObject().getAsJsonArray("changes").get(0).getAsJsonObject().getAsJsonObject("data");
+            assertTrue(data.has("syncedAt")); assertTrue(data.get("syncedAt").isJsonNull());
+        }
+    }
+    @Test void authAndRateLimitFailuresRemainRetryableAcrossRestart() throws Exception {
+        for(int code:List.of(401,403,408,429,503)) {
+            var a=chest("local:test"); Path trial=temp.resolve("status-"+code); httpCode.set(code);
+            try(var q=new IncrementalSyncQueue(trial)) {
+                q.configure(config); q.update(doc(a)); assertThrows(Exception.class,()->await(q.attempt("local:test",config,true)));
+                assertEquals("sent",q.pending("local:test").getFirst().status());
+            }
+            httpCode.set(200);
+            try(var q=new IncrementalSyncQueue(trial)) { q.configure(config); assertEquals(1,await(q.attempt("local:test",config,true))); }
+        }
+    }
+    @Test void deletedWorldBootstrapsAgainWithFreshChestChanges() throws Exception {
+        var chest = chest("local:test");
+        try (var queue = queue()) {
+            queue.versions(new SyncProtocol.Versions("26.3", "0.20.1", "1.0.0"));
+            queue.update(doc(chest));
+            assertEquals(1, await(queue.attempt("local:test", config, true)));
+            var before = new Gson().fromJson(body.get(), SyncProtocol.Request.class).changes().getFirst();
+            httpCode.set(409);
+            assertThrows(ExecutionException.class, () -> await(queue.attempt("local:test", config, true)));
+            httpCode.set(200);
+            assertEquals(1, await(queue.attempt("local:test", config, true)));
+            var request = new Gson().fromJson(body.get(), SyncProtocol.Request.class);
+            var recreated = request.changes().getFirst();
+            assertTrue(request.bootstrap());
+            assertEquals("26.3", request.minecraftVersion());
+            assertEquals(0L, recreated.baseServerRevision());
+            assertEquals(chest.id(), recreated.chestId());
+            assertNotEquals(before.changeId(), recreated.changeId());
+        }
+    }
+    @Test void envelope409RequestsBootstrapWithoutRejectingChanges() throws Exception {
+        var a=chest("local:test"); httpCode.set(409);
+        try(var q=queue()) {
+            q.update(doc(a)); assertThrows(Exception.class,()->await(q.attempt("local:test",config,true)));
+            assertEquals("sent",q.pending("local:test").getFirst().status());
+            httpCode.set(200); await(q.attempt("local:test",config,true));
+            assertTrue(new Gson().fromJson(body.get(),SyncProtocol.Request.class).bootstrap());
+        }
+    }
+    @Test void explicitRetryRecoversTransportRejectionWithoutDeletingQueue() throws Exception {
+        var a=chest("local:test"); httpCode.set(400);
+        try(var q=queue()) {
+            q.update(doc(a)); await(q.attempt("local:test",config,true)); String change=q.pending("local:test").getFirst().changeId();
+            assertEquals(1,q.retryRejected("local:test")); assertEquals(change,q.pending("local:test").getFirst().changeId());
+            httpCode.set(200); assertEquals(1,await(q.attempt("local:test",config,true)));
+        }
+    }
+    @Test void legacyMissingNullRepairArchivesOriginalAndIssuesNewChange() throws Exception {
+        var a=chest("local:test");var unknown=new ChestRecord(a.id(),a.identity(),a.name(),a.createdAt(),null,List.of(),false);
+        String oldId;Path file;
+        try(var q=queue()) { q.update(doc(unknown));oldId=q.pending("local:test").getFirst().changeId(); }
+        try(var paths=Files.walk(temp.resolve("incremental"))) { file=paths.filter(p->p.toString().endsWith(".json")).findFirst().orElseThrow(); }
+        var state=JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+        var change=state.getAsJsonArray("changes").get(0).getAsJsonObject();change.addProperty("status","rejected");change.getAsJsonObject("data").remove("syncedAt");
+        state.getAsJsonObject("diagnostics").addProperty(oldId,"rejected (HTTP request/configuration)"); Files.writeString(file,state.toString());
+        try(var q=queue()) {
+            assertEquals(1,q.retryRejected("local:test")); var repaired=q.pending("local:test").getFirst();
+            assertNotEquals(oldId,repaired.changeId());assertTrue(repaired.data().get("syncedAt").isJsonNull());
+            var repairedState=JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+            assertEquals(oldId,repairedState.getAsJsonArray("recoveredTransportHistory").get(0).getAsJsonObject().get("changeId").getAsString());
+            assertEquals(1,await(q.attempt("local:test",config,true)));
+        }
+    }
+    @Test void invalidEmptyBootstrapDoesNotLoop() throws Exception {
+        httpCode.set(400);
+        try(var q=queue()) {
+            q.worldName("local:test","Empty");q.update(doc());await(q.attempt("local:test",config,true));await(q.attempt("local:test",config,true));
+            assertEquals(1,calls.get());assertEquals(1,q.retryRejected("local:test"));httpCode.set(200);await(q.attempt("local:test",config,true));assertEquals(2,calls.get());
+        }
+    }
     @Test void http400IsPermanentAndNotRetried() throws Exception {
         httpCode.set(400); var a=chest("local:test"); try(var q=queue()) { q.update(doc(a)); assertEquals(0,await(q.attempt("local:test",config,true))); await(q.attempt("local:test",config,true)); assertEquals(1,calls.get()); assertEquals("rejected",q.pending("local:test").getFirst().status()); }
     }

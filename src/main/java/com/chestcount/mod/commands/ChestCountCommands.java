@@ -68,6 +68,9 @@ public final class ChestCountCommands {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher,access) -> {
             var root=literal("chestcount").executes(c -> help(app));
             root.then(literal("help").executes(c -> help(app)));
+            root.then(literal("connect").then(argument("code",StringArgumentType.word()).executes(c -> { app.connect(str(c,"code")); return 1; })));
+            root.then(literal("disconnect").executes(c -> { app.disconnect(); return 1; }));
+            root.then(literal("status").executes(c -> { app.connectionStatus(); return 1; }));
             root.then(literal("count").executes(c -> run(app,() -> {
                 var list=app.registry().world(app.world());
                 app.message("count",list.size(),list.stream().mapToLong(ChestRecord::total).sum(),list.stream().flatMap(r -> r.items().stream()).map(i -> i.item_id()).distinct().count());
@@ -110,6 +113,7 @@ public final class ChestCountCommands {
                 warnIncomplete(app);
             }))));
             root.then(literal("sync").executes(c -> { app.manualSync(); return 1; })
+                .then(literal("retry-rejected").executes(c -> { app.retryRejectedSync(); return 1; }))
                 .then(literal("status").executes(c -> { app.syncStatus(); return 1; }))
                 .then(literal("on").executes(c -> { app.automaticSync(true); return 1; }))
                 .then(literal("off").executes(c -> { app.automaticSync(false); return 1; })));
@@ -138,5 +142,5 @@ public final class ChestCountCommands {
         app.message("nearby",list.size());
         page(app,list,number,"/cc nearby "+radius+" ",r -> app.message("nearby_entry",r.name(),Math.round(r.identity().blocks().getFirst().distance(p.getX(),p.getY(),p.getZ()))));
     }); }
-    private static int help(ChestCountClient app) { app.message("help"); return 1; }
+    private static int help(ChestCountClient app) { app.message("help"); app.line("Ligação: /cc connect CODIGO | /cc disconnect | /cc status. Recuperação: /cc sync retry-rejected"); return 1; }
 }

@@ -1,4 +1,7 @@
 {
+  "chestcount.auto_chest_on": "Auto-Sync ativado para %s.",
+  "chestcount.auto_chest_off": "Auto-Sync desativado para %s.",
+  "chestcount.auto_chest_remote": "O Auto-Sync de baús fechados requer o servidor integrado. Abre o baú para sincronizar neste servidor.",
   "chestcount.text": "%s",
   "chestcount.registered": "Baú registado: %s",
   "chestcount.warning": "Estrutura do baú alterada.",

@@ -1,4 +1,7 @@
 {
+  "chestcount.auto_chest_on": "Auto-Sync enabled for %s.",
+  "chestcount.auto_chest_off": "Auto-Sync disabled for %s.",
+  "chestcount.auto_chest_remote": "Closed chest Auto-Sync requires the integrated server. Open the chest to synchronize on this server.",
   "chestcount.text": "%s",
   "chestcount.registered": "Chest registered: %s",
   "chestcount.warning": "Chest structure changed.",

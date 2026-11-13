@@ -6,6 +6,12 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.InteractionHand;
 
+/**
+ * Relaciona a interação com o bloco e o registo local do baú.
+ *
+ * A combinação de agachar e pena regista o baú ou alterna Auto-Sync local;
+ * a abertura normal é encaminhada para a observação confirmada do inventário.
+ */
 public final class ChestAssociationHandler {
     public static void register(ChestCountClient app) {
         UseBlockCallback.EVENT.register((player,level,hand,hit) -> {
@@ -18,7 +24,17 @@ public final class ChestAssociationHandler {
                 try {
                     boolean existed = app.registry().all().stream().anyMatch(r -> r.identity().equals(identity.get()));
                     var record = app.registry().register(identity.get());
-                    if (!existed) app.message("registered",record.name());
+                    if (!existed) {
+                        app.message("registered", record.name());
+                    } else if (app.registry().exact(identity.get()).isPresent()) {
+                        if (app.mc().hasSingleplayerServer()) {
+                            boolean enabled = app.registry().toggleAutoSync(record);
+                            app.message(enabled ? "auto_chest_on" : "auto_chest_off", record.name());
+                            app.flush();
+                        } else {
+                            app.message("auto_chest_remote");
+                        }
+                    }
                 } catch (RuntimeException e) { app.message("warning",e.getMessage()); }
                 app.sync().cancelPending();
                 // FAIL cancels locally without sending a packet or swinging. Open normally afterwards.

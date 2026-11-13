@@ -19,12 +19,17 @@ public final class ModConfig {
     }
     public static final class Sync {
         public boolean enabled = true, automatic = true;
-        public String endpoint = "http://127.0.0.1:8080/api/v1/sync";
+        public String endpoint = "http://127.0.0.1:8080/index.php/api/v1/sync";
         public int debounceSeconds=3, retryInitialSeconds=5, retryMaxSeconds=300;
+        public boolean playerSnapshots = true;
+        public int playerSnapshotSeconds = 30;
+        public int autoChestSeconds = 30;
         public int intervalSeconds = 30, connectTimeoutSeconds = 5, requestTimeoutSeconds = 10;
         public void validate() {
             com.chestcount.mod.integration.HttpSyncProvider.endpoint(endpoint);
             if(debounceSeconds<0 || debounceSeconds>300 || retryInitialSeconds<1 || retryMaxSeconds<retryInitialSeconds || retryMaxSeconds>86400) throw new IllegalArgumentException("Invalid retry settings");
+            if (autoChestSeconds < 10 || autoChestSeconds > 86400) throw new IllegalArgumentException("Invalid Auto-Sync interval");
+            if (playerSnapshotSeconds < 10 || playerSnapshotSeconds > 86400) throw new IllegalArgumentException("Invalid player snapshot interval");
             if (intervalSeconds < 1 || intervalSeconds > 86400 || connectTimeoutSeconds < 1 || connectTimeoutSeconds > 120 || requestTimeoutSeconds < 1 || requestTimeoutSeconds > 300)
                 throw new IllegalArgumentException("Invalid sync timeouts");
         }
@@ -45,7 +50,7 @@ public final class ModConfig {
             var c = gson.fromJson(Files.readString(path),ModConfig.class);
             if (c == null || c.formatVersion != 1 || c.outlineRadius < 1 || c.outlineRadius > 128 || c.nearbyRadius < 1 || c.nearbyRadius > 4096 || c.trustedServers == null || c.worldAliases == null) throw new IllegalArgumentException("Invalid config");
             if (c.sync == null) c.sync = new Sync();
-            if(c.sync.endpoint.equals("http://127.0.0.1:8080/api/sync")) c.sync.endpoint="http://127.0.0.1:8080/api/v1/sync";
+            if(c.sync.endpoint.equals("http://127.0.0.1:8080/api/sync")) c.sync.endpoint="http://127.0.0.1:8080/index.php/api/v1/sync";
             if(c.backup==null) c.backup=new Backup();
             c.backup.validate(); c.sync.validate();
             return c;

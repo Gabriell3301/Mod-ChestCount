@@ -18,9 +18,17 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.*;
 
+/**
+ * Coordena o ciclo do mod, os mundos ativos e a persistência antes da sincronização.
+ *
+ * O estado do jogo é atualizado na thread do cliente; o executor de disco serializa
+ * as escritas e a preparação da fila. O contador de geração invalida cargas antigas.
+ */
 public final class ChestCountClient implements ClientModInitializer {
     public static ChestCountClient INSTANCE;
     private final ChestRegistryService registry = new ChestRegistryService();
+    private final com.chestcount.mod.integration.PlayerSnapshotSync playerSnapshots = new com.chestcount.mod.integration.PlayerSnapshotSync();
+    private final AutoChestSync autoChests = new AutoChestSync();
     private final InventorySyncService sync = new InventorySyncService(this);
     private final ExecutorService disk = Executors.newSingleThreadExecutor(r -> new Thread(r,"Chest Count disk"));
     private final Path root = FabricLoader.getInstance().getConfigDir().resolve("chestcount");
@@ -43,14 +51,23 @@ public final class ChestCountClient implements ClientModInitializer {
     public String world() { return world; }
     public boolean ready() { return ready; }
     public long ticks() { return ticks; }
+    /**
+     * Regista eventos e prepara configuração e credenciais sem bloquear o arranque do cliente.
+     */
     public void onInitializeClient() {
         INSTANCE = this;
+        com.chestcount.mod.integration.DeviceCredentials.initialize(root);
         disk.execute(() -> {
             try { var loaded = ModConfig.load(root.resolve("config.json")); http.configure(loaded.sync); mc().execute(() -> config = loaded); }
             catch (Exception e) { error(e); }
         });
         ChestAssociationHandler.register(this); ChestCountCommands.register(this); ChestOutlineRenderer.register(this);
         ClientTickEvents.END_CLIENT_TICK.register(mc -> tick());
+    /**
+     * Agenda a gravação de uma revisão antes de atualizar a fila HTTP.
+     *
+     * Se a escrita local falhar, marca a revisão para nova tentativa em vez de confirmar persistência.
+     */
         ClientPlayConnectionEvents.DISCONNECT.register((handler,mc) -> { flush(); generation++; world=null; ready=false; sync.reset(); registry.load(List.of()); });
         ClientLifecycleEvents.CLIENT_STOPPING.register(mc -> {
             flush(); http.close(); disk.shutdown();
@@ -63,15 +80,20 @@ public final class ChestCountClient implements ClientModInitializer {
         String current = WorldIdentityService.current(mc(),config);
         if (!Objects.equals(current,world)) {
             flush(); generation++; world=current; ready=false; sync.reset(); registry.load(List.of());
+    /**
+     * Carrega o documento fora da thread do jogo e aplica-o apenas se o mundo ainda for o mesmo.
+     */
             if (world != null) loadWorld();
         }
         sync.tick();
+        autoChests.tick(this);
+        playerSnapshots.tick(mc(), ready ? world : null, config.sync, disk);
         if (ready && savedRevision!=registry.revision()) flush();
         if (ready && world != null && ticks%20 == 0 && sync.uploadSafe()) {
-            var target=world; var settings=config.sync;
+            var target=world; var settings=config.sync; var originalName=WorldIdentityService.name(mc()); var versions=com.chestcount.mod.integration.SyncProtocol.Versions.current();
             disk.execute(() -> { try {
                 var doc=persistedSnapshots.get(target);
-                if(doc!=null) { http.configure(settings); http.update(doc); finishConfirmedInventories(doc); http.attempt(target,settings,false); }
+                if(doc!=null) { http.configure(settings); http.worldName(target,originalName); http.versions(versions); http.update(doc); finishConfirmedInventories(doc); http.attempt(target,settings,false); }
             } catch(Exception e) { error(e); } });
         }
         if(ready && world!=null && ticks%20==0) {
@@ -95,6 +117,9 @@ public final class ChestCountClient implements ClientModInitializer {
             }
         }
     }
+    /**
+     * Carrega o documento fora da thread do jogo e aplica-o apenas se o mundo ainda for o mesmo.
+     */
     private void loadWorld() {
         var requested = world; var token = generation;
         disk.execute(() -> {
@@ -121,6 +146,11 @@ public final class ChestCountClient implements ClientModInitializer {
             } catch (Exception e) { mc().execute(() -> { if (token == generation) ready=previouslyReady; }); error(e); }
         });
     }
+    /**
+     * Agenda a gravação de uma revisão antes de atualizar a fila HTTP.
+     *
+     * Se a escrita local falhar, marca a revisão para nova tentativa em vez de confirmar persistência.
+     */
     public void flush() {
         if (!ready || world == null || savedRevision == registry.revision()) return;
         var target = world; var data = registry.world(world); var revision = registry.revision(); var token = generation; var settings=config.sync;
@@ -174,6 +204,73 @@ public final class ChestCountClient implements ClientModInitializer {
             else if(error==null && http.status(target,settings).conflicts()>0) line("Alterações em conflito ou rejeitadas. Consulta /cc sync status.");
             else line(error==null?count+" alterações confirmadas.":"Servidor indisponível. Dados guardados localmente.");
         })));
+    }
+    private String deviceError(Throwable error) {
+        while(error.getCause()!=null && (error instanceof CompletionException || error instanceof java.util.concurrent.ExecutionException)) error=error.getCause();
+        if(error instanceof com.chestcount.mod.integration.HttpSyncProvider.HttpStatusException status) return "HTTP "+status.status+": verifica o código, a ligação e o estado do dispositivo.";
+        return "Servidor indisponível ou credencial local inválida. Dados locais preservados.";
+    }
+    public void connect(String code) {
+        line("A ligar Minecraft à conta...");
+        var endpoint=config.sync.endpoint; var options=config.sync;
+        disk.execute(() -> {
+            try {
+                var prior=com.chestcount.mod.integration.DeviceCredentials.load(endpoint);
+                if(prior!=null) { mc().execute(() -> line("Executa /cc disconnect antes de ligar outro dispositivo.")); return; }
+                var input=new com.google.gson.JsonObject(); input.addProperty("code",code); input.addProperty("label","Minecraft Fabric");
+                new com.chestcount.mod.integration.HttpSyncProvider(options).deviceRequest("link/exchange",input.toString(),null).whenComplete((body,error) -> {
+                    if(error!=null) { mc().execute(() -> line(deviceError(error))); return; }
+                    try {
+                        var value=com.google.gson.JsonParser.parseString(body).getAsJsonObject();
+                        var credential=new com.chestcount.mod.integration.DeviceCredentials.Credential(value.get("token").getAsString(),value.get("deviceId").getAsString(),value.get("expiresAt").getAsString(),false);
+                        com.chestcount.mod.integration.DeviceCredentials.save(endpoint,credential);
+                        mc().execute(() -> { playerSnapshots.reconnect(); line("Minecraft ligado. A sincronização utiliza agora este dispositivo."); });
+                    } catch(Exception e) { mc().execute(() -> line("Não foi possível guardar a ligação. Revoga o dispositivo no website antes de repetir.")); }
+                });
+            } catch(Exception e) { mc().execute(() -> line(deviceError(e))); }
+        });
+    }
+    /**
+     * Suspende localmente o envio antes de tentar revogar a credencial no servidor.
+     *
+     * Uma falha de rede mantém a revogação pendente sem eliminar inventários ou a fila.
+     */
+    public void disconnect() {
+        var endpoint=config.sync.endpoint; var options=config.sync;
+        disk.execute(() -> {
+            try {
+                com.chestcount.mod.integration.DeviceCredentials.markDisconnected(endpoint);
+                var current=com.chestcount.mod.integration.DeviceCredentials.load(endpoint);
+                if(current==null) { mc().execute(() -> line("Desligado localmente. Tokens antigos de ambiente devem ser revogados no servidor.")); return; }
+                com.chestcount.mod.integration.DeviceCredentials.save(endpoint,new com.chestcount.mod.integration.DeviceCredentials.Credential(current.token(),current.deviceId(),current.expiresAt(),true));
+                new com.chestcount.mod.integration.HttpSyncProvider(options).deviceRequest("device/disconnect","{}",current.token()).whenComplete((body,error) -> {
+                    Throwable cause=error;
+                    while(cause instanceof CompletionException && cause.getCause()!=null) cause=cause.getCause();
+                    if(error==null || cause instanceof com.chestcount.mod.integration.HttpSyncProvider.HttpStatusException status && status.status==401) {
+                        try { com.chestcount.mod.integration.DeviceCredentials.clear(endpoint); mc().execute(() -> line("Dispositivo desligado. Inventários e fila preservados.")); }
+                        catch(Exception e) { mc().execute(() -> line("Revogado no servidor; volta a executar /cc disconnect para limpar a credencial local.")); }
+                    } else mc().execute(() -> line("Sincronização suspensa. Revogação pendente por falha de rede: repete /cc disconnect ou revoga no website."));
+                });
+            } catch(Exception e) { mc().execute(() -> line(deviceError(e))); }
+        });
+    }
+    public void connectionStatus() {
+        var endpoint=config.sync.endpoint; var options=config.sync;
+        disk.execute(() -> {
+            try {
+                var credential=com.chestcount.mod.integration.DeviceCredentials.load(endpoint);
+                if(credential!=null && credential.disconnectPending()) { mc().execute(() -> line("Desligado localmente; revogação pendente. Repete /cc disconnect.")); return; }
+                String token=com.chestcount.mod.integration.DeviceCredentials.token(endpoint);
+                new com.chestcount.mod.integration.HttpSyncProvider(options).deviceRequest("device/status","{}",token).whenComplete((body,error) -> mc().execute(() -> {
+                    line(error==null?"Ligado à conta ChestCount.":deviceError(error)); if(world!=null) syncStatus();
+                }));
+            } catch(Exception e) { mc().execute(() -> line("Desligado. Gera um código no website e executa /cc connect CODIGO.")); }
+        });
+    }
+    public void retryRejectedSync() {
+        if(world==null) { message("not_ready"); return; }
+        var target=world; var settings=config.sync;
+        disk.execute(() -> { try { http.configure(settings); int count=http.retryRejected(target); mc().execute(() -> line(count+" pedidos de transporte recuperados. Executa /cc sync.")); } catch(Exception e) { error(e); } });
     }
     public void syncStatus() {
         if (world==null) { message("not_ready"); return; }

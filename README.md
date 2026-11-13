@@ -1,3 +1,5 @@
+Atualização de 10/11/2026: utiliza [/cc connect, dispositivos e mundos persistentes](docs/ACCOUNT-LINKING.md). Não é necessário definir tokens de ambiente; as instruções históricas abaixo mantêm-se apenas para compatibilidade.
+
 > A versão atual usa protocolo incremental `/api/v1/sync`, backups automáticos e import/export. Consulta [o guia completo](docs/INCREMENTAL-SYNC.md); as secções da primeira integração HTTP abaixo ficam como contexto histórico.
 
 # Chest Count
@@ -162,3 +164,9 @@ O estado local é guardado quando muda; backups completos independentes são cri
 O endpoint atual é `http://127.0.0.1:8080/api/v1/sync`. Envia apenas alterações por UUID, com fila persistente, revisões locais e do servidor, idempotência, bootstrap e diagnóstico de conflitos. O servidor Python consolida em SQLite. Ver [configuração completa](docs/config.example.json), [arquitetura e operação](docs/INCREMENTAL-SYNC.md) e [validação](docs/VALIDATION.md).
 
 Conflitos de inventário podem ser recuperados reabrindo e fechando o baú, com nova leitura confirmada e base remota atualizada. [Regras e proteções](docs/INVENTORY-CONFLICT-RECOVERY.md).
+
+## Inventário pessoal e Auto-Sync de baús
+
+Depois de ligar a conta com /cc connect, o mod recolhe os slots e atributos do jogador a cada 30 segundos. Em config/chestcount/config.json, sync.playerSnapshotSeconds regula o intervalo e sync.playerSnapshots permite desativar este envio. Observações idênticas usam um heartbeat de dois minutos, ou o próprio intervalo configurado quando superior.
+
+Em single-player, usa Shift + clique direito com uma pena num baú registado para alternar o Auto-Sync. O primeiro clique continua a registar baús novos. O intervalo sync.autoChestSeconds é de 30 segundos por omissão. O servidor integrado verifica os baús marcados nos chunks carregados. Em servidores remotos, abre o baú normalmente para atualizar o seu inventário.

@@ -11,7 +11,12 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.*;
 
-/** Upload-only transport. Redirects and remote inventory writes are deliberately unsupported. */
+/**
+ * Transporta JSON sem bloquear a thread do jogo e limita pedidos e respostas.
+ *
+ * Exige HTTPS em destinos remotos e recusa redirecionamentos para não encaminhar
+ * credenciais inadvertidamente; não altera inventários no Minecraft.
+ */
 public final class HttpSyncProvider implements SyncProvider {
     public static final class HttpStatusException extends java.io.IOException {
         public final int status;
@@ -33,6 +38,10 @@ public final class HttpSyncProvider implements SyncProvider {
             throw new IllegalArgumentException("Remote sync endpoints require HTTPS");
         return uri;
     }
+    /** Read the launcher environment without writing secrets to logs or config files. */
+    private String authorization() {
+        return "Bearer " + DeviceCredentials.token(uri.toString());
+    }
     public HttpSyncProvider(ModConfig.Sync config) {
         config.validate(); uri = endpoint(config.endpoint);
         timeout = Duration.ofSeconds(config.requestTimeoutSeconds);
@@ -42,7 +51,7 @@ public final class HttpSyncProvider implements SyncProvider {
     public CompletionStage<Void> send(String json) {
         byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
         if (bytes.length > MAX_BYTES) return CompletableFuture.failedFuture(new IllegalArgumentException("Sync document exceeds 8 MiB"));
-        var request = HttpRequest.newBuilder(uri).timeout(timeout).header("Content-Type", "application/json; charset=utf-8")
+        var request = HttpRequest.newBuilder(uri).timeout(timeout).header("Content-Type", "application/json; charset=utf-8").header("Authorization", authorization())
             .POST(HttpRequest.BodyPublishers.ofByteArray(bytes)).build();
         return client.sendAsync(request,HttpResponse.BodyHandlers.discarding()).thenApply(response -> {
             if (response.statusCode() < 200 || response.statusCode() >= 300) throw new CompletionException(new java.io.IOException("HTTP " + response.statusCode()));
@@ -67,26 +76,40 @@ public final class HttpSyncProvider implements SyncProvider {
     }
     /** Bounded JSON response, read off the Minecraft thread. */
     public CompletionStage<String> exchange(String json) {
+        try {
         byte[] bytes=json.getBytes(StandardCharsets.UTF_8);
         if(bytes.length>MAX_BYTES) return CompletableFuture.failedFuture(new IllegalArgumentException("Sync request too large"));
-        var request=HttpRequest.newBuilder(uri).timeout(timeout).header("Content-Type","application/json; charset=utf-8")
+        var request=HttpRequest.newBuilder(uri).timeout(timeout).header("Content-Type","application/json; charset=utf-8").header("Authorization", authorization())
             .POST(HttpRequest.BodyPublishers.ofByteArray(bytes)).build();
         return client.sendAsync(request,info -> limitedResponse()).thenApply(response -> {
             if(response.statusCode()!=200) throw new CompletionException(new HttpStatusException(response.statusCode()));
             if(response.body().length>1024*1024) throw new CompletionException(new java.io.IOException("Invalid sync response"));
             return new String(response.body(),StandardCharsets.UTF_8);
         });
+        } catch(RuntimeException e) { return CompletableFuture.failedFuture(e); }
+    }
+    public CompletionStage<String> deviceRequest(String route,String json,String token) {
+        if(!java.util.Set.of("link/exchange","device/status","device/disconnect","player/snapshot").contains(route)) throw new IllegalArgumentException("Invalid device route");
+        var builder=HttpRequest.newBuilder(uri.resolve(route)).timeout(timeout).header("Content-Type","application/json");
+        if(token!=null) builder.header("Authorization","Bearer "+token);
+        if(route.equals("device/status")) builder.GET(); else builder.POST(HttpRequest.BodyPublishers.ofString(json));
+        return client.sendAsync(builder.build(),info -> limitedResponse()).thenApply(response -> {
+            if(response.statusCode()!=200) throw new CompletionException(new HttpStatusException(response.statusCode()));
+            return new String(response.body(),StandardCharsets.UTF_8);
+        });
     }
     /** Read only the revision/metadata needed for an explicitly reopened chest. */
     public CompletionStage<String> readChest(String world,String chest) {
+        try {
         java.util.UUID.fromString(chest);
         String encoded=java.net.URLEncoder.encode(world,StandardCharsets.UTF_8).replace("+","%20");
         URI target=uri.resolve("worlds/"+encoded+"/chests/"+chest);
-        var request=HttpRequest.newBuilder(target).timeout(timeout).header("Accept","application/json").GET().build();
+        var request=HttpRequest.newBuilder(target).timeout(timeout).header("Accept","application/json").header("Authorization", authorization()).GET().build();
         return client.sendAsync(request,info -> limitedResponse()).thenApply(response -> {
             if(response.statusCode()!=200) throw new CompletionException(new HttpStatusException(response.statusCode()));
             return new String(response.body(),StandardCharsets.UTF_8);
         });
+        } catch(RuntimeException e) { return CompletableFuture.failedFuture(e); }
     }
     public CompletionStage<Void> enqueue(ChestRecord snapshot, long localRevision) {
         return send(new Gson().toJson(new JsonStorageService.Document(1,snapshot.identity().world(),List.of(snapshot))));

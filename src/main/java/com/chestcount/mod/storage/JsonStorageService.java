@@ -7,7 +7,11 @@ import java.nio.charset.StandardCharsets;
 import java.io.IOException;
 import java.util.*;
 
-/** Called exclusively on one disk executor. Validates the complete document before replacing state. */
+/**
+ * Persiste documentos JSON de observações locais com substituição atómica.
+ *
+ * A chave derivada do mundo separa ficheiros e a validação evita carregar registos incoerentes.
+ */
 public final class JsonStorageService {
     public record Document(int formatVersion, String world, List<ChestRecord> chests) {}
     private final Path root;

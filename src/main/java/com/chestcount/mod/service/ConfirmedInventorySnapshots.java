@@ -5,7 +5,12 @@ import com.chestcount.mod.storage.JsonStorageService;
 import java.io.IOException;
 import java.util.*;
 
-/** Disk-worker owned. A closed, authoritative snapshot is finalized only after its exact local write succeeds. */
+/**
+ * Relaciona a confirmação de um inventário fechado com a respetiva gravação local.
+ *
+ * Só liberta a operação quando o documento persistido contém exatamente o snapshot
+ * confirmado; uma falha de escrita conserva a prova para nova tentativa.
+ */
 public final class ConfirmedInventorySnapshots {
     @FunctionalInterface public interface Finalizer { void finish(ChestRecord snapshot) throws IOException; }
     private final Map<String,Map<String,ChestRecord>> pending=new HashMap<>();
@@ -16,6 +21,9 @@ public final class ConfirmedInventorySnapshots {
     public void invalidate(String world,String chest) {
         var records=pending.get(world); if(records!=null) records.remove(chest);
     }
+    /**
+     * Finaliza apenas snapshots iguais aos escritos; mantém pendências se o finalizador falhar.
+     */
     public void persisted(JsonStorageService.Document document,Finalizer finalizer) throws IOException {
         var records=pending.get(document.world()); if(records==null) return;
         var byId=new HashMap<String,ChestRecord>(); document.chests().forEach(r -> byId.put(r.id(),r));

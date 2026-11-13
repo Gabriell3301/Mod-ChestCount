@@ -26,9 +26,24 @@ public final class ChestCountGameTest implements FabricClientGameTest {
         final java.util.Map<String,com.chestcount.mod.integration.SyncProtocol.Result> receipts=new java.util.concurrent.ConcurrentHashMap<>();
         final java.util.Set<String> conflictOnce=java.util.concurrent.ConcurrentHashMap.newKeySet();
         final java.util.concurrent.atomic.AtomicInteger conflicts=new java.util.concurrent.atomic.AtomicInteger(), revisionReads=new java.util.concurrent.atomic.AtomicInteger();
+        final java.util.concurrent.atomic.AtomicBoolean linked=new java.util.concurrent.atomic.AtomicBoolean();
         TestHttp() {
             try {
                 server=com.sun.net.httpserver.HttpServer.create(new java.net.InetSocketAddress("127.0.0.1",0),0);
+                server.createContext("/api/v1/link/exchange",exchange -> {
+                    var body=com.google.gson.JsonParser.parseString(new String(exchange.getRequestBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+                    boolean valid=body.get("code").getAsString().equals("ABCDEF123456") && linked.compareAndSet(false,true);
+                    byte[] bytes=(valid?"{\"deviceId\":\"00000000-0000-4000-8000-000000000001\",\"token\":\"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\",\"expiresAt\":\"2030-01-01T00:00:00Z\"}":"{}").getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(valid?200:400,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();
+                });
+                server.createContext("/api/v1/device/status",exchange -> {
+                    byte[] bytes="{\"connected\":true,\"deviceId\":\"00000000-0000-4000-8000-000000000001\"}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(linked.get()?200:401,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();
+                });
+                server.createContext("/api/v1/device/disconnect",exchange -> {
+                    linked.set(false); byte[] bytes="{\"disconnected\":true}".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    exchange.sendResponseHeaders(200,bytes.length);exchange.getResponseBody().write(bytes);exchange.close();
+                });
                 server.createContext("/api/v1/sync",exchange -> {
                     var gson=new com.google.gson.Gson();
                     var request=gson.fromJson(new String(exchange.getRequestBody().readAllBytes(),java.nio.charset.StandardCharsets.UTF_8),com.chestcount.mod.integration.SyncProtocol.Request.class);
@@ -98,11 +113,21 @@ public final class ChestCountGameTest implements FabricClientGameTest {
         } catch(Exception e) { return -1; }
     }
     public void runTest(ClientGameTestContext context) {
+        org.slf4j.LoggerFactory.getLogger("chestcount-test").info("CHESTCOUNT_GAME_TEST_STARTED");
         try (var http=new TestHttp(); var world=context.worldBuilder().create()) {
             context.waitFor(mc -> ChestCountClient.INSTANCE.ready());
             context.runOnClient(mc -> {
                 var config=ChestCountClient.INSTANCE.config().sync;
                 config.endpoint=http.endpoint(); config.enabled=true; config.automatic=true;
+                try {
+                    var dispatcher=ClientCommands.getActiveDispatcher();
+                    var source=(FabricClientCommandSource)mc.getConnection().getSuggestionsProvider();
+                    check(dispatcher.execute("cc connect ABCDEF123456",source)==1,"Connect command executes in Minecraft");
+                } catch(com.mojang.brigadier.exceptions.CommandSyntaxException e) { throw new AssertionError(e); }
+            });
+            context.waitFor(mc -> {
+                try { return http.linked.get() && com.chestcount.mod.integration.DeviceCredentials.load(http.endpoint())!=null; }
+                catch(java.io.IOException e) { return false; }
             });
             var pos=new BlockPos(0,80,0);
             world.getServer().runCommand("tp @a 0 81 3 180 25");
@@ -217,8 +242,10 @@ public final class ChestCountGameTest implements FabricClientGameTest {
                 var dispatcher=ClientCommands.getActiveDispatcher();
                 var source=(FabricClientCommandSource)mc.getConnection().getSuggestionsProvider();
                 try {
-                    for(var command:java.util.List.of("cc sync status","cc sync off","cc sync","cc sync on","cc backup","cc backup list","cc export"))
+                    for(var command:java.util.List.of("cc status","cc sync status","cc sync off","cc sync","cc sync on","cc sync retry-rejected","cc backup","cc backup list","cc export"))
                         check(dispatcher.execute(command,source)==1,"Sync command registered: "+command);
+                    for(var command:java.util.List.of("cc connect ABCDEF123456","cc disconnect"))
+                        check(!dispatcher.parse(command,source).getReader().canRead(),"Connection command parses: "+command);
                 } catch(com.mojang.brigadier.exceptions.CommandSyntaxException e) { throw new AssertionError(e); }
             });
             context.waitTicks(5);
@@ -303,8 +330,14 @@ public final class ChestCountGameTest implements FabricClientGameTest {
                 try {
                     check(dispatcher.execute("cc remove Recursos confirm",source)==1,"Confirm removal by current name");
                     check(ChestCountClient.INSTANCE.registry().all().isEmpty(),"Only confirmed removal deletes the record");
+                    check(dispatcher.execute("cc disconnect",source)==1,"Disconnect command executes in Minecraft");
                 } catch(com.mojang.brigadier.exceptions.CommandSyntaxException e) { throw new AssertionError(e); }
             });
+            context.waitFor(mc -> {
+                try { return !http.linked.get() && com.chestcount.mod.integration.DeviceCredentials.load(http.endpoint())==null; }
+                catch(java.io.IOException e) { return false; }
+            });
         }
+        org.slf4j.LoggerFactory.getLogger("chestcount-test").info("CHESTCOUNT_GAME_TEST_COMPLETED");
     }
 }

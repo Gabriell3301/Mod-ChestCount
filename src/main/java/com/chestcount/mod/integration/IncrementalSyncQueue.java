@@ -11,18 +11,31 @@ import java.util.*;
 import java.util.concurrent.*;
 import static com.chestcount.mod.integration.SyncProtocol.*;
 
-/** Durable per-destination outbox. Sent changes are immutable until explicitly acknowledged. */
+/**
+ * Mantém uma outbox durável por endpoint e mundo para o protocolo incremental.
+ *
+ * Alterações enviadas permanecem imutáveis até confirmação; conflitos e falhas de
+ * transporte conservam diagnósticos e dados para recuperação explícita.
+ */
 public final class IncrementalSyncQueue implements AutoCloseable {
-    private static final Gson GSON=new GsonBuilder().setPrettyPrinting().create();
+    private static final Gson GSON =
+            new GsonBuilder()
+                    .serializeNulls()
+                    .setPrettyPrinting()
+                    .create();
     private static final class State {
         int formatVersion=1;
         boolean bootstrapped;
+        boolean metadataRejected;
         transient boolean dirty;
         String world;
+        String worldName, uploadedWorldName;
+        Versions uploadedVersions;
         Map<String,ChestRecord> desired=new LinkedHashMap<>(), staged=new LinkedHashMap<>();
         Map<String,Long> revisions=new HashMap<>(), serverRevisions=new HashMap<>();
         Set<String> held=new HashSet<>();
         List<Change> changes=new ArrayList<>();
+        List<Change> recoveredTransportHistory=new ArrayList<>();
         Map<String,String> diagnostics=new LinkedHashMap<>();
         // Keep old conflicts until this replacement is accepted, including across restart.
         Map<String,Set<String>> inventoryRecoveries=new HashMap<>();
@@ -44,10 +57,37 @@ public final class IncrementalSyncQueue implements AutoCloseable {
     private final Map<String,Status> statuses=new ConcurrentHashMap<>();
     private final ExecutorService worker=Executors.newSingleThreadExecutor(r -> { var t=new Thread(r,"Chest Count incremental confirmations"); t.setDaemon(true); return t; });
     private ModConfig.Sync settings=new ModConfig.Sync();
+    private Versions versions;
     private String clientId;
     private boolean closed;
     public IncrementalSyncQueue(Path root) { this.root=root; }
     public synchronized void configure(ModConfig.Sync config) { settings=GSON.fromJson(GSON.toJson(config),ModConfig.Sync.class); }
+    public synchronized void versions(Versions versions) { this.versions = versions; }
+    public synchronized void worldName(String world,String name) throws IOException {
+        if(name==null || name.isBlank()) return;
+        var s=state(world);
+        String bounded=name.codePointCount(0,name.length())>100?name.substring(0,name.offsetByCodePoints(0,100)):name;
+        if(!Objects.equals(s.worldName,bounded)) { s.worldName=bounded; s.metadataRejected=false; persist(key(world),s); }
+    }
+    /** Retry only transport-level rejections: immutable IDs/payloads remain intact. Server business rejections stay blocked. */
+    public synchronized int retryRejected(String world) throws IOException {
+        var s=state(world); int count=s.metadataRejected?1:0; s.metadataRejected=false;
+        for(int i=0;i<s.changes.size();i++) {
+            var c=s.changes.get(i);
+            if(c.status().equals("rejected") && s.diagnostics.getOrDefault(c.changeId(),"").contains("HTTP request/configuration")) {
+                if(c.operation().equals("upsert") && !c.data().has("syncedAt") && c.data().has("items") && c.data().getAsJsonArray("items").isEmpty()) {
+                    // Old Gson omitted the explicit null. HTTP validation rejected the whole batch,
+                    // so no receipt exists. Preserve the original and issue a new repair operation.
+                    s.recoveredTransportHistory.add(c);
+                    var repaired=c.data().deepCopy(); repaired.add("syncedAt",JsonNull.INSTANCE);
+                    long revision=s.revisions.merge(c.chestId(),1L,Long::sum);
+                    s.changes.set(i,new Change(UUID.randomUUID().toString(),c.clientId(),c.worldId(),c.chestId(),c.dimension(),revision,c.operation(),null,repaired,Instant.now().toString(),"pending"));
+                } else s.changes.set(i,c.status(c.baseServerRevision()==null?"pending":"sent",c.baseServerRevision()));
+                s.diagnostics.remove(c.changeId()); count++;
+            }
+        }
+        persist(key(world),s); return count;
+    }
     private String key(String world) { return JsonStorageService.key(settings.endpoint)+"/"+JsonStorageService.key(world); }
     private Path file(String key) { return root.resolve("incremental").resolve(key+".json"); }
     public synchronized String clientId() throws IOException {
@@ -170,7 +210,11 @@ public final class IncrementalSyncQueue implements AutoCloseable {
         } catch(RuntimeException e) { return false; }
         return true;
     }
-    /** Caller must first persist this authoritative closed-menu snapshot and update/release the outbox. */
+    /**
+     * Tenta reconciliar um inventário reaberto depois da sua confirmação e persistência.
+     *
+     * A consulta remota serve para recuperar revisão e metadados, não para preencher itens no jogo.
+     */
     public synchronized CompletionStage<Boolean> recoverInventory(String world,ChestRecord persistedSnapshot) {
         return recoverInventory(world,persistedSnapshot,false);
     }
@@ -226,6 +270,11 @@ public final class IncrementalSyncQueue implements AutoCloseable {
     public Status status(String world,ModConfig.Sync config) {
         return statuses.getOrDefault(JsonStorageService.key(config.endpoint)+"/"+JsonStorageService.key(world),new Status(false,false,0,false,false,0,0,List.of()));
     }
+    /**
+     * Seleciona um lote elegível e processa confirmações ou falhas com backoff limitado.
+     *
+     * Retém dados perante falhas de autenticação e prepara bootstrap se o mundo for desconhecido.
+     */
     public synchronized CompletionStage<Integer> attempt(String world,ModConfig.Sync config,boolean manual) {
         configure(config); String key=key(world);
         if(closed) return CompletableFuture.failedFuture(new IOException("Sync stopped"));
@@ -246,7 +295,10 @@ public final class IncrementalSyncQueue implements AutoCloseable {
                 if(c.status().equals("pending")) { c=c.status("sent",s.serverRevisions.getOrDefault(c.chestId(),0L)); s.changes.set(i,c); }
                 batch.add(c);
             }
-            if(batch.isEmpty()) {
+            boolean metadataSync=!s.metadataRejected && s.held.isEmpty() && (s.changes.isEmpty() && s.desired.isEmpty() && !s.bootstrapped
+                || s.worldName!=null && !Objects.equals(s.worldName,s.uploadedWorldName)
+                || versions != null && (!versions.equals(s.uploadedVersions) || manual || System.currentTimeMillis() - s.lastSuccess >= 60000));
+            if(batch.isEmpty() && !metadataSync) {
                 if(manual) {
                     var lookups=reopened.entrySet().stream().filter(e -> e.getKey().startsWith(key+"/"))
                         .map(e -> e.getValue().lookup).filter(f -> f!=null && !f.isDone()).toArray(CompletableFuture[]::new);
@@ -255,7 +307,12 @@ public final class IncrementalSyncQueue implements AutoCloseable {
                 return CompletableFuture.completedFuture(0);
             }
             persist(key,s); // Freeze IDs, payloads and bases before any bytes leave the process.
-            String json=GSON.toJson(new Request(1,clientId(),world,!s.bootstrapped,List.copyOf(batch)));
+            final String sentWorldName=s.worldName;
+            final Versions sentVersions = versions;
+            String json=GSON.toJson(new Request(1,clientId(),world,!s.bootstrapped,List.copyOf(batch),sentWorldName,
+                    sentVersions == null ? null : sentVersions.minecraftVersion(),
+                    sentVersions == null ? null : sentVersions.fabricVersion(),
+                    sentVersions == null ? null : sentVersions.modVersion()));
             var result=new CompletableFuture<Integer>(); flights.put(key,result); publish(key,s);
             new HttpSyncProvider(requestSettings).exchange(json).whenCompleteAsync((body,error) -> {
                 synchronized(this) {
@@ -263,7 +320,26 @@ public final class IncrementalSyncQueue implements AutoCloseable {
                         int accepted=0;
                         if(error!=null) {
                             Throwable cause=error; while(cause instanceof CompletionException && cause.getCause()!=null) cause=cause.getCause();
+                            // Authentication can be repaired; keep the durable entries retryable.
+                            if (cause instanceof HttpSyncProvider.HttpStatusException http && (http.status==401 || http.status==403))
+                                throw new IOException("HTTP " + http.status + ": use /cc connect CODE; pending data retained");
+                            if(cause instanceof HttpSyncProvider.HttpStatusException http && http.status==409) {
+                                if (s.bootstrapped) {
+                                    // This endpoint uses HTTP 409 for an unknown source world. Rebuild the
+                                    // outbox from local observations with a new base and fresh change IDs.
+                                    s.bootstrapped = false;
+                                    s.serverRevisions.clear();
+                                    s.staged.clear();
+                                    s.recoveredTransportHistory.addAll(s.changes);
+                                    s.changes.clear();
+                                    s.inventoryRecoveries.clear();
+                                    s.diagnostics.clear();
+                                    stage(s);
+                                }
+                                throw new IOException("HTTP 409: world bootstrap will be reconciled; pending data retained");
+                            }
                             if(cause instanceof HttpSyncProvider.HttpStatusException http && http.status>=400 && http.status<500 && http.status!=408 && http.status!=429 || cause instanceof IllegalArgumentException) {
+                                if(batch.isEmpty()) { s.metadataRejected=true; s.diagnostics.put("transport","World registration rejected; check endpoint and /cc sync retry-rejected after correction"); }
                                 for(var c:batch) {
                                     for(int i=0;i<s.changes.size();i++) if(s.changes.get(i).chestId().equals(c.chestId())) s.changes.set(i,s.changes.get(i).status("rejected",s.changes.get(i).baseServerRevision()));
                                     s.diagnostics.put(c.changeId(),c.chestId()+": rejected (HTTP request/configuration)");
@@ -298,9 +374,10 @@ public final class IncrementalSyncQueue implements AutoCloseable {
                             }
                         }
                         stage(s); // Preserve edits that arrived while a recovery request was in flight.
-                        s.bootstrapped=true; s.failures=0; s.lastSuccess=System.currentTimeMillis(); s.due=System.currentTimeMillis()+requestSettings.debounceSeconds*1000L;
+                        s.bootstrapped=true; s.uploadedWorldName=sentWorldName; s.uploadedVersions=sentVersions; s.failures=0; s.diagnostics.remove("transport"); s.lastSuccess=System.currentTimeMillis(); s.due=System.currentTimeMillis()+requestSettings.debounceSeconds*1000L;
                         persist(key,s); result.complete(accepted);
                     } catch(Exception e) {
+                        s.diagnostics.put("transport",e.getMessage()!=null && e.getMessage().startsWith("HTTP ")?e.getMessage():"Network/response unavailable; pending data retained");
                         s.failures++; s.due=System.currentTimeMillis()+Math.min(requestSettings.retryMaxSeconds*1000L,requestSettings.retryInitialSeconds*1000L*(1L<<Math.min(s.failures-1,16)));
                         try { persist(key,s); } catch(IOException ignored) { /* original on-disk sent entries remain retryable */ }
                         result.completeExceptionally(new IOException("Sync unavailable; data retained"));

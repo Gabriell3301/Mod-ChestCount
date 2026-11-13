@@ -4,7 +4,12 @@ import com.chestcount.mod.model.*;
 import java.time.Instant;
 import java.util.*;
 
-/** Main-thread owned registry; immutable records are safe to hand to the disk worker. */
+/**
+ * Gere baús e revisões na thread principal, partilhando registos imutáveis com o disco.
+ *
+ * Estruturas sobrepostas não são substituídas silenciosamente; alterações físicas
+ * invalidam a observação anterior até nova associação adequada.
+ */
 public final class ChestRegistryService {
     private final Map<String, ChestRecord> records = new LinkedHashMap<>();
     private long revision;
@@ -66,6 +71,13 @@ public final class ChestRegistryService {
         records.put(r.id(), r.rename(name)); revision++;
     }
     public void remove(String id, String world) { records.remove(get(id, world).id()); revision++; }
+    public boolean toggleAutoSync(ChestRecord chest) {
+        var updated = chest.withAutoSync(!chest.autoSync());
+        records.put(chest.id(), updated);
+        revision++;
+        return updated.autoSync();
+    }
+
     public void snapshot(String id, ChestIdentity identity, List<ItemRecord> items) {
         var r = records.get(id);
         if (r == null || r.structureChanged() || !r.identity().equals(identity)) throw new IllegalStateException("Inventory identity changed");
